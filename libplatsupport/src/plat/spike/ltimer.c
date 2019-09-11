@@ -62,13 +62,13 @@ static int get_nth_pmem(void *data, size_t n, pmem_region_t *region)
 
 static int get_time(void *data, uint64_t *time)
 {
-    hcsc1_ltimer_t *fvp_ltimer = data;
+    hcsc1_ltimer_t *hcsc1_ltimer = data;
     assert(data != NULL);
     assert(time != NULL);
 
-    hcsc1_t *dualtimer = &fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1];
+    hcsc1_t *dualtimer = &hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1];
     uint64_t low_ticks = hcsc1_get_ticks(dualtimer);
-    uint64_t ticks = fvp_ltimer->high_bits + !!hcsc1_is_irq_pending(dualtimer);
+    uint64_t ticks = hcsc1_ltimer->high_bits + !!hcsc1_is_irq_pending(dualtimer);
     ticks = (ticks << 32llu) + low_ticks;
     *time = hcsc1_ticks_to_ns(ticks);
     return 0;
@@ -76,12 +76,12 @@ static int get_time(void *data, uint64_t *time)
 
 int handle_irq(void *data, ps_irq_t *irq)
 {
-    hcsc1_ltimer_t *fvp_ltimer = data;
+    hcsc1_ltimer_t *hcsc1_ltimer = data;
     if (irq->irq.number == hcsc1_get_irq(HCSC1_ID + TIMEOUT_HCSC1)) {
-        hcsc1_handle_irq(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1]);
+        hcsc1_handle_irq(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1]);
     } else if (irq->irq.number == hcsc1_get_irq(HCSC1_ID + TIMESTAMP_HCSC1)) {
-        hcsc1_handle_irq(&fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
-        fvp_ltimer->high_bits++;
+        hcsc1_handle_irq(&hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
+        hcsc1_ltimer->high_bits++;
     } else {
         ZF_LOGE("unknown irq");
         return EINVAL;
@@ -103,8 +103,8 @@ int set_timeout(void *data, uint64_t ns, timeout_type_t type)
         ns -= time;
     }
 
-    hcsc1_ltimer_t *fvp_ltimer = data;
-    return hcsc1_set_timeout(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1], ns,
+    hcsc1_ltimer_t *hcsc1_ltimer = data;
+    return hcsc1_set_timeout(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1], ns,
             type == TIMEOUT_PERIODIC);
 }
 
@@ -115,14 +115,14 @@ static int get_resolution(void *data, uint64_t *resolution)
 
 static int reset(void *data)
 {
-    hcsc1_ltimer_t *fvp_ltimer = data;
+    hcsc1_ltimer_t *hcsc1_ltimer = data;
 
     // The seven timer driver tests are passing even if the stop and start below is disabled.
     // From the assumed interface semantics it seems natural to stop and start the timer.
 
     /* restart the rtc */
-    hcsc1_stop(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1]);
-    hcsc1_start(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1]);
+    hcsc1_stop(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1]);
+    hcsc1_start(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1]);
     return 0;
 }
 
@@ -130,22 +130,22 @@ static void destroy(void *data)
 {
     pmem_region_t region;
     UNUSED int error;
-    hcsc1_ltimer_t *fvp_ltimer = data;
+    hcsc1_ltimer_t *hcsc1_ltimer = data;
 
-    if (fvp_ltimer->hcsc1_timer0_vaddr) {
-        hcsc1_stop(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1]);
+    if (hcsc1_ltimer->hcsc1_timer0_vaddr) {
+        hcsc1_stop(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1]);
         error = get_nth_pmem(data, 0,  &region);
         assert(!error);
-        ps_pmem_unmap(&fvp_ltimer->ops, region, fvp_ltimer->hcsc1_timer0_vaddr);
+        ps_pmem_unmap(&hcsc1_ltimer->ops, region, hcsc1_ltimer->hcsc1_timer0_vaddr);
     }
 
-    if (fvp_ltimer->hcsc1_timer1_vaddr) {
-        hcsc1_stop(&fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
+    if (hcsc1_ltimer->hcsc1_timer1_vaddr) {
+        hcsc1_stop(&hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
         error = get_nth_pmem(data, 1,  &region);
         assert(!error);
-        ps_pmem_unmap(&fvp_ltimer->ops, region, fvp_ltimer->hcsc1_timer1_vaddr);
+        ps_pmem_unmap(&hcsc1_ltimer->ops, region, hcsc1_ltimer->hcsc1_timer1_vaddr);
     }
-    ps_free(&fvp_ltimer->ops.malloc_ops, sizeof(fvp_ltimer), fvp_ltimer);
+    ps_free(&hcsc1_ltimer->ops.malloc_ops, sizeof(hcsc1_ltimer), hcsc1_ltimer);
 }
 
 int ltimer_default_init(ltimer_t *ltimer, ps_io_ops_t ops)
@@ -168,29 +168,29 @@ int ltimer_default_init(ltimer_t *ltimer, ps_io_ops_t ops)
         return error;
     }
     assert(ltimer->data != NULL);
-    hcsc1_ltimer_t *fvp_ltimer = ltimer->data;
-    fvp_ltimer->ops = ops;
+    hcsc1_ltimer_t *hcsc1_ltimer = ltimer->data;
+    hcsc1_ltimer->ops = ops;
 
     /* map the frame for the hcsc1 timers */
     pmem_region_t region;
     error = get_nth_pmem(NULL, 0, &region);
     assert(error == 0);
-    fvp_ltimer->hcsc1_timer0_vaddr = ps_pmem_map(&ops, region, false, PS_MEM_NORMAL);
-    if (fvp_ltimer->hcsc1_timer0_vaddr == NULL) {
+    hcsc1_ltimer->hcsc1_timer0_vaddr = ps_pmem_map(&ops, region, false, PS_MEM_NORMAL);
+    if (hcsc1_ltimer->hcsc1_timer0_vaddr == NULL) {
         error = ENOMEM;
     }
 
     /* set up an HCSC1 for timeouts */
     hcsc1_config_t hcsc1_config = {
-        .vaddr = fvp_ltimer->hcsc1_timer0_vaddr,
+        .vaddr = hcsc1_ltimer->hcsc1_timer0_vaddr,
         .id = HCSC1_ID
     };
 
     if (!error) {
-        error = hcsc1_init(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1], hcsc1_config);
+        error = hcsc1_init(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1], hcsc1_config);
     }
     if (!error) {
-        hcsc1_start(&fvp_ltimer->hcsc1s[TIMEOUT_HCSC1]);
+        hcsc1_start(&hcsc1_ltimer->hcsc1s[TIMEOUT_HCSC1]);
     }
 
     /* set up a HCSC1_TIMER for timestamps */
@@ -198,21 +198,21 @@ int ltimer_default_init(ltimer_t *ltimer, ps_io_ops_t ops)
     error = get_nth_pmem(NULL, 1, &region);
     assert(error == 0);
 
-    fvp_ltimer->hcsc1_timer1_vaddr = ps_pmem_map(&ops, region, false, PS_MEM_NORMAL);
-    if (fvp_ltimer->hcsc1_timer1_vaddr == NULL) {
+    hcsc1_ltimer->hcsc1_timer1_vaddr = ps_pmem_map(&ops, region, false, PS_MEM_NORMAL);
+    if (hcsc1_ltimer->hcsc1_timer1_vaddr == NULL) {
         error = ENOMEM;
     }
 
-    hcsc1_config.vaddr = fvp_ltimer->hcsc1_timer1_vaddr;
+    hcsc1_config.vaddr = hcsc1_ltimer->hcsc1_timer1_vaddr;
 
     if (!error) {
-        error = hcsc1_init(&fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1], hcsc1_config);
+        error = hcsc1_init(&hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1], hcsc1_config);
     }
     if (!error) {
-        hcsc1_start(&fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
+        hcsc1_start(&hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1]);
     }
     if (!error) {
-        error = hcsc1_set_timeout_ticks(&fvp_ltimer->hcsc1s[TIMESTAMP_HCSC1], UINT32_MAX, true);
+        error = hcsc1_set_timeout_ticks(&hcsc1_ltimer->hcsc1s[TIMESTAMP_HCSC1], UINT32_MAX, true);
     }
 
     /* if there was an error, clean up */
