@@ -352,7 +352,6 @@ static int get_nth_pmem(
     return 0;
 }
 
-
 //-----------------------------------------------------------------------------
 static int get_time(
     void *data,
@@ -369,11 +368,10 @@ static int get_time(
     // uint64_t ticks = timer->high_bits + !!hcsc1_is_irq_pending(timer_timestamp);
     // ticks = (ticks << 32llu) + low_ticks;
 
-    *time = hcsc1_ticks_to_ns(ticks);
+    // *time = hcsc1_ticks_to_ns(ticks);
 
     return 0;
 }
-
 
 //-----------------------------------------------------------------------------
 int handle_irq(
