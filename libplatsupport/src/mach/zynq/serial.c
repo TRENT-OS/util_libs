@@ -204,6 +204,12 @@ int uart_getchar(
         }
     }
 
+    /* TODO: add more documentation why we have to clear the receive trigger
+     *       here again. This seems wrong, because new chars might have arrived
+     *       and they are lost.
+     */
+    regs->isr = UART_ISR_RTRIG;
+
     regs->ier = imr;
 
     return c;
