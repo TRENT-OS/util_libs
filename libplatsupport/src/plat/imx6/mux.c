@@ -697,6 +697,12 @@ imx6_mux_feature_enable(mux_sys_t* mux, mux_feature_t mux_feature, UNUSED enum m
         m->iomuxc->uart1_uart_rx_data_select_input  = IOMUXC_IS_DAISY(3);
         return 0;
 
+    case MUX_USDHC2_CD_B:
+        ZF_LOGD("Muxing for USDHC2\n");
+        m->iomuxc->sw_mux_ctl_pad_gpio04 = IOMUXC_MUXCTL_MODE(6)
+                                           | IOMUXC_MUXCTL_FORCE_INPUT;
+        return 0;
+
     default:
         return -1;
     }
