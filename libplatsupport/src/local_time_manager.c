@@ -73,10 +73,18 @@ static int update_with_time(void *data, uint64_t curr_time)
             return 0;
         }
 
+        uint64_t time_a = 0;
+        get_time(data,&time_a);
         error = ltimer_set_timeout(state->ltimer, next_time, TIMEOUT_ABSOLUTE);
         if (error == ETIME) {
             int ret = ltimer_get_time(state->ltimer, &curr_time);
             ZF_LOGF_IF(ret, "failed to read time");
+        }
+        uint64_t time_b = 0;
+        get_time(data,&time_b);
+        if(time_b - time_a > 1000 * 1000)
+        {
+            printf("\n\n\n update_with_time - Start: %jd End: %jd \n\n\n",time_a,time_b);
         }
 
         if (error == 0) {
@@ -103,12 +111,15 @@ static int register_cb(void *data, timeout_type_t type, uint64_t ns,
 
     switch (type) {
     case TIMEOUT_ABSOLUTE:
+        // ZF_LOGE("TIMEOUT_ABSOLUTE set: %lld - %lld\n",ns , curr_time);
         timeout.abs_time = ns;
         break;
     case TIMEOUT_RELATIVE:
+        // ZF_LOGE("TIMEOUT_RELATIVE set: %lld - %lld\n",ns , curr_time);
         timeout.abs_time = curr_time + ns;
         break;
     case TIMEOUT_PERIODIC:
+        // ZF_LOGE("TIMEOUT_PERIODIC set: %lld - %lld - %lld\n",ns , curr_time, start);
         if (start) {
             timeout.abs_time = start;
         } else {

@@ -234,7 +234,19 @@ static inline int tm_update(time_manager_t *tm)
         return error;
     }
 
-    return tm->update_with_time(tm->data, time);
+    uint64_t time_a = 0;
+    tm_get_time(tm,&time_a);
+    int ret = tm->update_with_time(tm->data,time);
+    uint64_t time_b = 0;
+    tm_get_time(tm,&time_b);
+    if(time_b - time_a > 1000 * 1000)
+    {
+        printf("\n\n\n tm_update - Start: %jd End: %jd \n\n\n",time_a,time_b);
+    }
+
+    return ret;
+
+    // return tm->update_with_time(tm->data, time);
 }
 
 static inline int tm_update_with_time(time_manager_t *tm, uint64_t time)

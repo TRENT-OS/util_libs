@@ -139,15 +139,29 @@ static int set_timeout(void *data, uint64_t ns, timeout_type_t type)
     spt_ltimer_t *spt_ltimer = data;
     spt_ltimer->period = 0;
 
+    uint64_t time_a = 0;
+    uint64_t time_b = 0;
+    int ret = -1;
+
     switch (type) {
     case TIMEOUT_ABSOLUTE:
-        return system_timer_set_timeout(&spt_ltimer->system, ns);
+        get_time(data,&time_a);
+        ret = system_timer_set_timeout(&spt_ltimer->system, ns);
+        // return system_timer_set_timeout(&spt_ltimer->system, ns);
+        get_time(data,&time_b);
+        break;
     case TIMEOUT_PERIODIC:
         spt_ltimer->period = ns;
         /* fall through */
     case TIMEOUT_RELATIVE:
         return spt_set_timeout(&spt_ltimer->spt, ns);
     }
+    
+    if(time_b - time_a > 500 * 1000)
+    {
+        printf("\n\n\n set_timeout - Start: %jd End: %jd \n\n\n",time_a,time_b);
+    }
+    if(ret >= 0) return ret;
 
     return EINVAL;
 }

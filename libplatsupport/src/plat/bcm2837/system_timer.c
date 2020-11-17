@@ -60,10 +60,14 @@ int system_timer_set_timeout(system_timer_t *timer, uint64_t ns) {
 
     /* Can only set a timeout within the next 2^32 microseconds. */
     uint64_t time = system_timer_get_time(timer);
+    uint64_t tmp = 0;
     uint64_t ticks = time / SYSTEM_TIMER_NS_PER_TICK;
     uint64_t timeout_ticks = ns / SYSTEM_TIMER_NS_PER_TICK;
     if (timeout_ticks < ticks) {
+        tmp = time;
+        time = system_timer_get_time(timer);
         ZF_LOGE("Timeout in the past\n");
+        ZF_LOGE("system_timer_set_timeout - Timestamp: %jd Start: %jd End: %jd",ns,tmp,time);
         return ETIME;
     } else if ((timeout_ticks - ticks) > UINT32_MAX) {
         ZF_LOGE("Timeout too far in the future\n");
@@ -76,10 +80,12 @@ int system_timer_set_timeout(system_timer_t *timer, uint64_t ns) {
     uint32_t timeout = timeout_ticks & MASK(32);
     timer->regs->compare[SYSTEM_TIMER_MATCH] = timeout;
 
+    tmp = time;
     time = system_timer_get_time(timer);
     if (time >= ns && !(timer->regs->ctrl & BIT(SYSTEM_TIMER_MATCH))) {
         timer->regs->ctrl = BIT(SYSTEM_TIMER_MATCH);
         ZF_LOGE("Timeout missed\n");
+        ZF_LOGE("system_timer_set_timeout - Timestamp: %jd Start: %jd End: %jd",ns,tmp,time);
         return ETIME;
     }
 

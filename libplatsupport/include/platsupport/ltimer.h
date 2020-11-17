@@ -155,6 +155,8 @@ static inline int ltimer_get_resolution(ltimer_t *timer, uint64_t *resolution)
     return timer->get_resolution(timer->data, resolution);
 }
 
+static inline int ltimer_get_time(ltimer_t *timer, uint64_t *time);
+
 static inline int ltimer_set_timeout(ltimer_t *timer, uint64_t nanoseconds, timeout_type_t type)
 {
     if (!timer) {
@@ -177,7 +179,18 @@ static inline int ltimer_set_timeout(ltimer_t *timer, uint64_t nanoseconds, time
             return EINVAL;
     }
 
-    return timer->set_timeout(timer->data, nanoseconds, type);
+    uint64_t time_a = 0;
+    ltimer_get_time(timer,&time_a);
+    int ret = timer->set_timeout(timer->data, nanoseconds, type);
+    uint64_t time_b = 0;
+    ltimer_get_time(timer,&time_b);
+    if(time_b - time_a > 1000 * 1000)
+    {
+        printf("\n\n\n ltimer_set_timeout - Start: %jd End: %jd \n\n\n",time_a,time_b);
+    }
+
+    return ret;
+    // return timer->set_timeout(timer->data, nanoseconds, type);
 }
 
 static inline size_t ltimer_get_num_irqs(ltimer_t *timer)
