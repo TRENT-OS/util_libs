@@ -41,6 +41,7 @@ void enet_print_mib(struct enet *enet);
 void enet_print_state(struct enet *enet);
 
 struct enet * enet_init(
+    void *enet_mapping,
     uint32_t tx_phys,
     uint32_t rx_phys,
     uint32_t rx_bufsize,

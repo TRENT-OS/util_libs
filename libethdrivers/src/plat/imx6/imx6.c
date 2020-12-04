@@ -26,6 +26,18 @@
 #include "uboot/micrel.h"
 #include "unimplemented.h"
 
+#if defined(CONFIG_PLAT_IMX6)
+
+#define IMX6_ENET_PADDR 0x02188000
+#define IMX6_ENET_SIZE  0x00004000
+
+#elif defined(CONFIG_PLAT_IMX8MQ_EVK)
+
+#define IMX6_ENET_PADDR 0x30be0000
+#define IMX6_ENET_SIZE  0x10000
+
+#endif
+
 
 #define IRQ_MASK    (NETIRQ_RXF | NETIRQ_TXF | NETIRQ_EBERR)
 
@@ -486,8 +498,18 @@ static struct raw_iface_funcs iface_fns = {
 static int
 obtain_mac(
     uint8_t* mac,
+    const nic_config_t* nic_config,
     ps_io_ops_t *io_ops)
 {
+    if (nic_config && (0 != memcmp(
+                                nic_config->mac,
+                                "\x00\x00\x00\x00\x00\x00",
+                                sizeof(nic_config->mac)))) {
+        LOG_INFO("obtain MAC from nic_config");
+        memcpy(mac, nic_config->mac, sizeof(nic_config->mac));
+        return 0;
+    }
+
     /* read MAC from eFuses */
     LOG_INFO("obtain MAC from OCOTP");
     struct ocotp *ocotp = ocotp_init(&io_ops->io_mapper);
@@ -495,10 +517,11 @@ obtain_mac(
         LOG_ERROR("Failed to initialize OCOTP");
         return -1;
     }
-    int err = ocotp_get_mac(ocotp, mac);
+    unsigned int enet_id = nic_config ? nic_config->id : 0;
+    int err = ocotp_get_mac(ocotp, enet_id, mac);
     ocotp_free(ocotp, &io_ops->io_mapper);
     if (err) {
-        LOG_ERROR("Failed to get MAC from OCOTP, code %d", err);
+        LOG_ERROR("Failed to get MAC for ID %d from OCOTP, code %d", enet_id, err);
         return -1;
     }
 
@@ -509,12 +532,16 @@ obtain_mac(
 static int
 ethif_imx6_init(
     struct eth_driver *driver,
-    ps_io_ops_t *io_ops)
+    ps_io_ops_t *io_ops,
+    const nic_config_t* nic_config)
 {
     int err;
 
+    /* configuration */
+    unsigned int enet_id = nic_config ? nic_config->id : 0;
+
     uint8_t mac[6];
-    err = obtain_mac(mac, io_ops);
+    err = obtain_mac(mac, nic_config, io_ops);
     if (err) {
         LOG_ERROR("Failed to obtain MAC, code %d", err);
         return -1;
@@ -543,14 +570,38 @@ ethif_imx6_init(
     }
 
     /* Initialise ethernet pins, also does a PHY reset */
+    if (0 != enet_id) {
+        LOG_ERROR("Unsupported ENET ID %u", enet_id);
+        goto error;
+    }
     err = setup_iomux_enet(io_ops);
     if (err) {
-        LOG_ERROR("Failed to setup IOMUX for ENET, code %d", err);
+        LOG_ERROR("Failed to setup IOMUX for ENET id=%d, code %d", enet_id, err);
+        goto error;
+    }
+
+    /* Map in the device */
+    void *enet_mapping = NULL;
+
+    switch (enet_id)
+    {
+        case 0:
+            enet_mapping = RESOURCE(&io_ops->io_mapper, IMX6_ENET);
+            break;
+
+        default:
+            LOG_ERROR("Unsupported ENET ID %u", enet_id);
+            goto error;
+    }
+
+    if (!enet_mapping) {
+        LOG_ERROR("ethernet controller ENET %u could not be mapped", enet_id);
         goto error;
     }
 
     /* Initialise the RGMII interface */
     struct enet *enet = enet_init(
+                            enet_mapping,
                             dev->tx_ring_phys,
                             dev->rx_ring_phys,
                             BUF_SIZE,
@@ -564,8 +615,13 @@ ethif_imx6_init(
     }
     dev->enet = enet;
 
-    /* enable promiscuous mode */
-    enet_prom_enable(enet);
+    /* enable promiscuous mode by default if nothing else is specified */
+    if (!nic_config || nic_config->promiscuous_mode) {
+        enet_prom_enable(enet);
+    }
+    else {
+        enet_prom_disable(enet);
+    }
 
     /* Initialise the phy library */
     miiphy_init();
@@ -573,6 +629,11 @@ ethif_imx6_init(
     phy_micrel_init();
     /* Connect the phy to the ethernet controller */
     unsigned int phy_mask = 0xffffffff;
+    if (nic_config && (0 != nic_config->phy_address))
+    {
+        LOG_INFO("using PHY address %d from config", nic_config->phy_address);
+        phy_mask = BIT(nic_config->phy_address);
+    }
     struct phy_device *phydev = fec_init(phy_mask, enet);
     if (!phydev) {
         LOG_ERROR("Failed to initialize fec");
@@ -689,8 +750,14 @@ ethif_imx_init_module(
     ps_io_ops_t *io_ops,
     const char *device_path)
 {
-    struct eth_driver *eth_driver;
+    /* get a configuration if function is implemented */
+    const nic_config_t* nic_config = NULL;
+    if (get_nic_configuration) {
+        LOG_INFO("calling get_nic_configuration()");
+        nic_config = get_nic_configuration();
+    }
 
+    struct eth_driver *eth_driver = NULL;
     int error = ps_calloc(
                     &io_ops->malloc_ops,
                     1,
@@ -739,7 +806,7 @@ ethif_imx_init_module(
         return -ENODEV;
     }
 
-    error = ethif_imx6_init(eth_driver, io_ops);
+    error = ethif_imx6_init(eth_driver, io_ops, nic_config);
     if (error) {
         LOG_ERROR("Failed to initialise the Ethernet driver, code %d", error);
         return -ENODEV;

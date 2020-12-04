@@ -19,14 +19,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#ifdef CONFIG_PLAT_IMX6
-#define IMX6_ENET_PADDR 0x02188000
-#define IMX6_ENET_SIZE  0x00004000
-#endif
 #ifdef CONFIG_PLAT_IMX8MQ_EVK
-#define IMX6_ENET_PADDR 0x30be0000
-#define IMX6_ENET_SIZE  0x10000
-
 #define CCM_PADDR 0x30380000
 #define CCM_SIZE 0x10000
 #endif
@@ -601,6 +594,7 @@ enet_prom_disable(
 /*----------------------------------------------------------------------------*/
 struct enet *
 enet_init(
+    void *enet_mapping,
     uint32_t tx_phys,
     uint32_t rx_phys,
     uint32_t rx_bufsize,
@@ -610,11 +604,7 @@ enet_init(
     struct clock *enet_clk_ptr = NULL;
 
     /* Map in the device */
-    enet_regs_t *regs = RESOURCE(&io_ops->io_mapper, IMX6_ENET);
-    if (!regs) {
-        LOG_ERROR("ethernet controller could not be mapped");
-        return NULL;
-    }
+    enet_regs_t *regs = enet_mapping;
     struct enet *enet = (struct enet *)regs;
 
     /* Perform reset */

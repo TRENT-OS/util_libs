@@ -184,26 +184,30 @@ void ocotp_free(struct ocotp *ocotp, ps_io_mapper_t *io_mapper)
     UNRESOURCE(io_mapper, IMX6_OCOTP, ocotp);
 }
 
-int ocotp_get_mac(struct ocotp *ocotp, unsigned char *mac)
+int ocotp_get_mac(struct ocotp* ocotp, unsigned int id, unsigned char *mac)
 {
-    ocotp_regs_t *regs;
-    uint32_t mac0;
-    uint32_t mac1;
-    assert(ocotp);
-
-    regs = ocotp_get_regs(ocotp);
-    mac0 = regs->mac0;
-    mac1 = regs->mac1;
-    if (mac0 | mac1) {
-        mac[0] = (mac1 >>  8) & 0xff;
-        mac[1] = (mac1 >>  0) & 0xff;
-
-        mac[2] = (mac0 >> 24) & 0xff;
-        mac[3] = (mac0 >> 16) & 0xff;
-        mac[4] = (mac0 >>  8) & 0xff;
-        mac[5] = (mac0 >>  0) & 0xff;
-        return 0;
-    } else {
+    if (0 != id) {
+        LOG_ERROR("Unsupported MAC ID %u", id);
         return -1;
     }
+
+    assert(ocotp);
+    ocotp_regs_t *regs = ocotp_get_regs(ocotp);
+    uint32_t mac0 = regs->mac0;
+    uint32_t mac1 = regs->mac1;
+
+    if (0 == (mac0 | mac1)) {
+        LOG_ERROR("No MAC configured");
+        return -1;
+    }
+
+    mac[0] = (mac1 >>  8) & 0xff;
+    mac[1] = (mac1 >>  0) & 0xff;
+
+    mac[2] = (mac0 >> 24) & 0xff;
+    mac[3] = (mac0 >> 16) & 0xff;
+    mac[4] = (mac0 >>  8) & 0xff;
+    mac[5] = (mac0 >>  0) & 0xff;
+
+    return 0;
 }

@@ -19,5 +19,5 @@ struct ocotp;
 struct ocotp *ocotp_init(ps_io_mapper_t *io_mapper);
 void ocotp_free(struct ocotp *ocotp, ps_io_mapper_t *io_mapper);
 
-int ocotp_get_mac(struct ocotp* ocotp, unsigned char *mac);
+int ocotp_get_mac(struct ocotp* ocotp, unsigned int id, unsigned char *mac);
 
