@@ -45,10 +45,10 @@ struct eth_device {
 	int iobase;
 	int state;
 	struct fec_priv *priv;
-        int (*write_hwaddr)(struct eth_device *dev);
+    int (*write_hwaddr)(struct eth_device *dev);
 };
 
-int fec_init(unsigned phy_mask, struct enet* enet);
+struct phy_device * fec_init(unsigned phy_mask, struct enet *enet);
 
 #define FEC_RCNTRL_MAX_FL_SHIFT		16
 #define FEC_RCNTRL_LOOP			0x00000001
