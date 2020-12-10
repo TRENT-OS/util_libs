@@ -274,12 +274,16 @@ _enet_get_freq(clk_t* clk)
 static freq_t
 _enet_set_freq(clk_t* clk, freq_t hz)
 {
-    uint32_t div, fin;
-    uint32_t v;
     if (clk_regs.alg == NULL) {
         return clk_get_freq(clk);
     }
-    fin = clk_get_freq(clk->parent);
+
+#if defined(CONFIG_PLAT_IMX6DQ)
+
+    uint32_t div;
+    uint32_t v;
+    uint32_t fin = clk_get_freq(clk->parent);
+
     if (hz >= 5 * fin) {
         div = 3;
     } else if (hz >= 4 * fin) {
@@ -291,18 +295,31 @@ _enet_set_freq(clk_t* clk, freq_t hz)
     } else {
         div = 0;
     }
+
     /* bypass on */
     clk_regs.alg->pll_enet.set = PLL_BYPASS;
+
     v = PLL_ENET_ENABLE | PLL_BYPASS;
     clk_regs.alg->pll_enet.val = v;
+
     /* Change the frequency */
     v = clk_regs.alg->pll_enet.val & ~(PLL_ENET_DIV_MASK);
     v |= div;
     clk_regs.alg->pll_enet.val = v;
+
     while (!(clk_regs.alg->pll_enet.val & PLL_LOCK));
+
     /* bypass off */
     clk_regs.alg->pll_enet.clr = PLL_BYPASS;
-    printf("Set ENET frequency to %ld Mhz... ", (long int)clk_get_freq(clk) / MHZ);
+
+#elif defined(CONFIG_PLAT_IMX6SX)
+
+    // don't do anything and just trust u-boot to have set things properly
+
+#else
+#error "unknown i.MX6 SOC"
+#endif
+
     return clk_get_freq(clk);
 }
 

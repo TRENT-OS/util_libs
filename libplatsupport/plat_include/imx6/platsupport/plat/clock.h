@@ -50,12 +50,14 @@ enum clock_gate {
     i2c2_serial  = CLK_GATE(2, 4),
     i2c1_serial  = CLK_GATE(2, 3),
     /* -- CCGR3 -- */
+#if defined(CONFIG_PLAT_IMX6DQ)
     ipu1_ipu     = CLK_GATE(3, 0),
     ipu1_ipu_di0 = CLK_GATE(3, 1),
     ipu1_ipu_di1 = CLK_GATE(3, 2),
     ipu2_ipu     = CLK_GATE(3, 3),
     ipu2_ipu_di0 = CLK_GATE(3, 4),
     ipu2_ipu_di1 = CLK_GATE(3, 5),
+#endif
     /* -- CCGR4 -- */
     /* -- CCGR5 -- */
 
@@ -66,8 +68,10 @@ enum clock_gate {
     usdhc3       = CLK_GATE(6, 3),
     usdhc4       = CLK_GATE(6, 4),
     eim_slow     = CLK_GATE(6, 5),
+#ifdef CONFIG_PLAT_IMX6Q
     vdoaxiclk    = CLK_GATE(6, 6),
     vpu          = CLK_GATE(6, 7),
+#endif
     NCLKGATES
 };
 
