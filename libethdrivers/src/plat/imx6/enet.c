@@ -24,7 +24,12 @@
 #define CCM_SIZE 0x10000
 #endif
 
+#ifdef CONFIG_PLAT_IMX6SX
+#define ENET_FREQ  133000000UL
+#else
 #define ENET_FREQ  125000000UL
+#endif
+
 #define MDC_FREQ    20000000UL /* must be less than 2.5MHz */
 
 struct mib_regs {

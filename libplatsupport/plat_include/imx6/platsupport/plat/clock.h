@@ -44,6 +44,9 @@ enum clk_id {
 enum clock_gate {
     /* -- CCGR0 -- */
     /* -- CCGR1 -- */
+#if defined(CONFIG_PLAT_IMX6DQ)
+    enet_clock   = CLK_GATE(1, 5),
+#endif
     /* -- CCGR2 -- */
     ocotp_ctrl   = CLK_GATE(2, 6),
     i2c3_serial  = CLK_GATE(2, 5),
@@ -57,6 +60,8 @@ enum clock_gate {
     ipu2_ipu     = CLK_GATE(3, 3),
     ipu2_ipu_di0 = CLK_GATE(3, 4),
     ipu2_ipu_di1 = CLK_GATE(3, 5),
+#elif defined(CONFIG_PLAT_IMX6SX)
+    enet_clock   = CLK_GATE(3, 2),
 #endif
     /* -- CCGR4 -- */
     /* -- CCGR5 -- */

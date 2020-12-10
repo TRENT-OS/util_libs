@@ -147,7 +147,12 @@ struct ocotp_regs {
     uint32_t res35[3];
     uint32_t mac1;            /* 630 */
     uint32_t res36[3];
+#ifdef CONFIG_PLAT_IMX6SX
+    uint32_t mac2;            /* 640 */
+    uint32_t res37[7];
+#else
     uint32_t res37[8];
+#endif
     uint32_t gp0;             /* 660 */
     uint32_t res38[3];
     uint32_t gp1;             /* 670 */
@@ -184,30 +189,99 @@ void ocotp_free(struct ocotp *ocotp, ps_io_mapper_t *io_mapper)
     UNRESOURCE(io_mapper, IMX6_OCOTP, ocotp);
 }
 
-int ocotp_get_mac(struct ocotp* ocotp, unsigned int id, unsigned char *mac)
+int ocotp_get_mac(struct ocotp *ocotp, unsigned int id, unsigned char *mac)
 {
-    if (0 != id) {
-        LOG_ERROR("Unsupported MAC ID %u", id);
-        return -1;
-    }
-
     assert(ocotp);
     ocotp_regs_t *regs = ocotp_get_regs(ocotp);
-    uint32_t mac0 = regs->mac0;
-    uint32_t mac1 = regs->mac1;
 
-    if (0 == (mac0 | mac1)) {
-        LOG_ERROR("No MAC configured");
-        return -1;
+    // mac0 = 0xaabbccdd
+    // mac1 = 0xeeffgghh
+    // mac2 = 0xiijjkkll
+    //
+    // ENET1 MAC: gg:hh:aa:bb:cc:dd (32 LSBs from mac0, 16 MSBs from mac1[15:0])
+    // ENET2 MAC: ii:jj:kk:ll:ee:ff (16 LSBs from mac1[31:16], 32 MSBs from mac2)
+
+    switch(id)
+    {
+        case 0:
+            {
+                uint32_t mac0 = regs->mac0;
+                uint32_t mac1 = regs->mac1;
+                mac[0] = (mac1 >>  8) & 0xff;
+                mac[1] = (mac1 >>  0) & 0xff;
+                mac[2] = (mac0 >> 24) & 0xff;
+                mac[3] = (mac0 >> 16) & 0xff;
+                mac[4] = (mac0 >>  8) & 0xff;
+                mac[5] = (mac0 >>  0) & 0xff;
+            }
+            break;
+
+#ifdef CONFIG_PLAT_IMX6SX
+
+        case 1:
+            {
+                uint32_t mac1 = regs->mac1;
+                uint32_t mac2 = regs->mac2;
+
+                mac[0] = (mac2 >> 24) & 0xff;
+                mac[1] = (mac2 >> 16) & 0xff;
+                mac[2] = (mac2 >>  8) & 0xff;
+                mac[3] = (mac2 >>  0) & 0xff;
+                mac[4] = (mac1 >> 24) & 0xff;
+                mac[5] = (mac1 >> 16) & 0xff;
+            }
+            break;
+
+#endif
+
+        default:
+            LOG_ERROR("Unsupported MAC ID %u", id);
+            return -1;
+
     }
 
-    mac[0] = (mac1 >>  8) & 0xff;
-    mac[1] = (mac1 >>  0) & 0xff;
+    // at least one bit must be set in the MAC to consider it valid
+    uint8_t mac_check = 0;
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        mac_check |= mac[i];
+    }
+    if (0 == mac_check)
+    {
 
-    mac[2] = (mac0 >> 24) & 0xff;
-    mac[3] = (mac0 >> 16) & 0xff;
-    mac[4] = (mac0 >>  8) & 0xff;
-    mac[5] = (mac0 >>  0) & 0xff;
+        LOG_ERROR("no MAC in OCOTP for id %d", id);
+
+#ifdef CONFIG_PLAT_IMX6SX
+
+        if (1 == id)
+        {
+            LOG_INFO("IMX6SX: no MAC for enet2 in OCOTP, use enet1 MAC + 1\n");
+            // use MAC from enet1 and add 1
+            if (0 != ocotp_get_mac(ocotp, 0, mac))
+            {
+                return -1;
+            }
+            // bytes 0-2 hold the fixed OID, increment bytes 3-5 with roll-over
+            mac[5]++;
+            if (0 == mac[5]) {
+                mac[4]++;
+                if (0 == mac[4]) {
+                    mac[3]++;
+                }
+            }
+        }
+
+#else
+
+
+        return -1;
+
+#endif
+
+    }
+
+    LOG_INFO("MAC for ID %d: %02x:%02x:%02x:%02x:%02x:%02x\n",
+           id, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     return 0;
 }

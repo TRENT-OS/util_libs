@@ -15,6 +15,23 @@
 #include <stdint.h>
 #include <platsupport/io.h>
 
+#ifdef CONFIG_PLAT_IMX6
+#define IMX6_ENET_PADDR 0x02188000
+#define IMX6_ENET_SIZE  0x00004000
+#endif
+#ifdef CONFIG_PLAT_IMX6SX
+#define IMX6_ENET2_PADDR 0x021b4000
+#define IMX6_ENET2_SIZE  0x00004000
+#endif
+#ifdef CONFIG_PLAT_IMX8MQ_EVK
+#define IMX6_ENET_PADDR 0x30be0000
+#define IMX6_ENET_SIZE  0x10000
+
+#define CCM_PADDR 0x30380000
+#define CCM_SIZE 0x10000
+#endif
+
+
 #define NETIRQ_BABR     (1UL << 30) /* Babbling Receive Error          */
 #define NETIRQ_BABT     (1UL << 29) /* Babbling Transmit Error         */
 #define NETIRQ_GRA      (1UL << 28) /* Graceful Stop Complete          */

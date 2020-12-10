@@ -39,6 +39,7 @@
 #include <string.h>
 #include "../enet.h"
 #include "../ocotp_ctrl.h"
+#include <utils/attribute.h>
 
 #undef DEBUG
 
@@ -59,6 +60,40 @@ static int fec_phy_write(
     uint16_t data)
 {
     return enet_mdio_write((struct enet *)bus->priv, phyAddr, regAddr, data);
+}
+
+int cb_phy_read(
+    struct mii_dev *bus,
+    UNUSED int phyAddr,
+    UNUSED int dev_addr,
+    int regAddr)
+{
+    nic_config_t* nic_config = (nic_config_t*)bus->priv;
+    if ((!nic_config) || (!nic_config->funcs.mdio_read))
+    {
+        LOG_ERROR("mdio_read() from nic_config not set");
+        assert(nic_config); // we should never be here if nic_config is NULL
+        return -1;
+    }
+    return nic_config->funcs.mdio_read(regAddr);
+}
+
+int cb_phy_write(
+    struct mii_dev *bus,
+    UNUSED int phyAddr,
+    UNUSED int dev_addr,
+    int regAddr,
+    uint16_t data)
+{
+    nic_config_t* nic_config = (nic_config_t*)bus->priv;
+    if ((!nic_config) || (!nic_config->funcs.mdio_write))
+    {
+        LOG_ERROR("mdio_write() from nic_config not set");
+        assert(nic_config); // we should never be here if nic_config is NULL
+        return -1;
+    }
+
+    return nic_config->funcs.mdio_write(regAddr, data);
 }
 
 // /**
@@ -85,8 +120,9 @@ static int fec_phy_write(
 // }
 
 struct phy_device * fec_init(
-    unsigned phy_mask, 
-    struct enet *enet)
+    unsigned int phy_mask,
+    struct enet* enet,
+    const nic_config_t* nic_config)
 {
     int ret;
 
@@ -96,10 +132,24 @@ struct phy_device * fec_init(
         LOG_ERROR("Could not allocate MDIO");
         return NULL;
     }
+
+#ifdef CONFIG_PLAT_IMX6SX
+    // on the i.MX6 SoloX Nitrogen board, both PHYs are connected to enet1's
+    // MDIO, while enet2's MDIO pins are used for other I/O purposes.
+    strncpy(bus->name, "MDIO-ENET1", sizeof(bus->name));
+#else
     strncpy(bus->name, "MDIO", sizeof(bus->name));
-    bus->read = fec_phy_read;
-    bus->write = fec_phy_write;
-    bus->priv = enet;
+#endif
+
+    /* if we don't have direct access to MDIO, use the callbacks from config */
+    if (!enet && !nic_config)
+    {
+        LOG_ERROR("Neither ENET nor nic_config is set, can't access MDIO");
+    }
+    bus->priv = enet ? enet : (struct enet *)nic_config;
+    bus->read = enet ? fec_phy_read : cb_phy_read;
+    bus->write = enet ? fec_phy_write : cb_phy_write;
+
     ret = mdio_register(bus);
     if (ret) {
         LOG_ERROR("Could not register MDIO, code %d", ret);
@@ -126,6 +176,46 @@ struct phy_device * fec_init(
     phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x8);
     phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x05);
     phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x100);
+
+    if (phydev->drv->config) {
+        phydev->drv->config(phydev);
+    }
+
+    if (phydev->drv->startup) {
+        phydev->drv->startup(phydev);
+    }
+
+#elif defined(CONFIG_PLAT_IMX6SX)
+
+    LOG_INFO("IMX6SX: Initializing PHY for Atheros");
+    int val;
+
+    /*
+     * Ar803x phy SmartEEE feature cause link status generates glitch,
+     * which cause ethernet link down/up issue, so disable SmartEEE
+     */
+    phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x3);
+    phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x805d);
+    phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4003);
+    val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
+    phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val & ~(1 << 8));
+
+    // /* To enable AR8031 ouput a 125MHz clk from CLK_25M */
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
+
+    // val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
+    // val &= 0xffe3;
+    // val |= 0x18;
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
+
+    /* rgmii tx clock delay enable */
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x05);
+    // val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
+    // phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, (val|0x0100));
+
+    // phydev->supported = phydev->drv->features;
 
     if (phydev->drv->config) {
         phydev->drv->config(phydev);

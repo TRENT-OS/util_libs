@@ -105,7 +105,7 @@ struct imx6_eth_data {
 
 
 /*----------------------------------------------------------------------------*/
-struct imx6_eth_data *
+static struct imx6_eth_data *
 get_dev_from_driver(
     struct eth_driver *driver)
 {
@@ -571,13 +571,14 @@ ethif_imx6_init(
 
     /* Initialise ethernet pins, also does a PHY reset */
     if (0 != enet_id) {
-        LOG_ERROR("Unsupported ENET ID %u", enet_id);
-        goto error;
+        LOG_INFO("skipping IOMUX setup for ENET id=%d", enet_id);
     }
-    err = setup_iomux_enet(io_ops);
-    if (err) {
-        LOG_ERROR("Failed to setup IOMUX for ENET id=%d, code %d", enet_id, err);
-        goto error;
+    else {
+        err = setup_iomux_enet(io_ops);
+        if (err) {
+            LOG_ERROR("Failed to setup IOMUX for ENET id=%d, code %d", enet_id, err);
+            goto error;
+        }
     }
 
     /* Map in the device */
@@ -588,6 +589,16 @@ ethif_imx6_init(
         case 0:
             enet_mapping = RESOURCE(&io_ops->io_mapper, IMX6_ENET);
             break;
+
+#ifdef CONFIG_PLAT_IMX6SX
+
+        case 1:
+            /* ENET2's MDIO is not used, must use ENET1 for this via RPC */
+            enet_mapping = RESOURCE(&io_ops->io_mapper, IMX6_ENET2);
+            LOG_INFO("ENET2 has no MDIO, will use MDIO from ENET1 via callback\n");
+            break;
+
+#endif
 
         default:
             LOG_ERROR("Unsupported ENET ID %u", enet_id);
@@ -608,7 +619,7 @@ ethif_imx6_init(
                             mac,
                             io_ops);
     if (!enet) {
-        LOG_ERROR("Failed to initialize RGMII");
+        LOG_ERROR("Failed to initialize RGMII for ENET %d", enet_id);
         /* currently no way to properly clean up enet */
         assert(!"enet cannot be cleaned up");
         goto error;
@@ -626,7 +637,14 @@ ethif_imx6_init(
     /* Initialise the phy library */
     miiphy_init();
     /* Initialise the phy */
+#if defined(CONFIG_PLAT_SABRE) || defined(CONFIG_PLAT_WANDQ)
     phy_micrel_init();
+#elif defined(CONFIG_PLAT_NITROGEN6SX)
+    phy_atheros_init();
+#else
+#error "unsupported board"
+#endif
+
     /* Connect the phy to the ethernet controller */
     unsigned int phy_mask = 0xffffffff;
     if (nic_config && (0 != nic_config->phy_address))
@@ -634,7 +652,11 @@ ethif_imx6_init(
         LOG_INFO("using PHY address %d from config", nic_config->phy_address);
         phy_mask = BIT(nic_config->phy_address);
     }
-    struct phy_device *phydev = fec_init(phy_mask, enet);
+    /* ENET1 has an MDIO interface, for ENET2 we use callbacks */
+    struct phy_device *phydev = fec_init(
+                                    phy_mask,
+                                    (0 == enet_id) ? enet : NULL,
+                                    nic_config);
     if (!phydev) {
         LOG_ERROR("Failed to initialize fec");
         goto error;
@@ -750,19 +772,35 @@ ethif_imx_init_module(
     ps_io_ops_t *io_ops,
     const char *device_path)
 {
+    int error;
+
     /* get a configuration if function is implemented */
     const nic_config_t* nic_config = NULL;
     if (get_nic_configuration) {
         LOG_INFO("calling get_nic_configuration()");
+        /* we can get NULL here, if somebody implementes this function but does
+         * not give us a config. It's a bit odd, but valid.
+         */
         nic_config = get_nic_configuration();
+        if (nic_config && nic_config->funcs.sync)
+        {
+            LOG_INFO("Waiting for primary NIC to finish initialization");
+            error = nic_config->funcs.sync();
+            if (error)
+            {
+                LOG_ERROR("pirmary NIC sync failed,  code %d", error);
+                return -ENODEV;
+            }
+            LOG_INFO("primary NIC init done, run secondary NIC init");
+        }
     }
 
     struct eth_driver *eth_driver = NULL;
-    int error = ps_calloc(
-                    &io_ops->malloc_ops,
-                    1,
-                    sizeof(*eth_driver),
-                    (void **) &eth_driver);
+    error = ps_calloc(
+                &io_ops->malloc_ops,
+                1,
+                sizeof(*eth_driver),
+                (void **) &eth_driver);
     if (error) {
         LOG_ERROR("Failed to allocate memory for the Ethernet driver, code %d", error);
         return -ENOMEM;
@@ -828,9 +866,13 @@ ethif_imx_init_module(
 /*----------------------------------------------------------------------------*/
 static const char *compatible_strings[] = {
     /* Other i.MX platforms may also be compatible but the platforms that have
-     * been tested are the SABRE Lite (i.MX6Quad) and i.MX8MQ Evaluation Kit
+     * been tested are:
+     *   - SABRE Lite (i.MX6Quad)
+     *   - Nitrogen6_SoloX (i.MX6SoloX)
+     *   - i.MX8MQ Evaluation Kit
      */
     "fsl,imx6q-fec",
+    "fsl,imx6sx-fec",
     "fsl,imx8mq-fec",
     NULL
 };
