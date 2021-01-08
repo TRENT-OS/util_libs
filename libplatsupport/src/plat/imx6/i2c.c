@@ -257,6 +257,7 @@ master_start(struct i2c_bus_priv* dev, char addr)
     clear_pending(dev);
     /* Write slave address */
     dev->regs->data = addr;
+    // dev->regs->data = 0x40;
 }
 
 static void
@@ -329,13 +330,17 @@ imx6_i2c_handle_irq(i2c_bus_t* i2c_bus)
 static inline void
 master_txstart(struct i2c_bus_priv* dev, int slave)
 {
-    master_start(dev, I2CDATA_WRITE(slave));
+    slave = (0x40 | slave);
+    master_start(dev, slave);
+    // master_start(dev, I2CDATA_WRITE(slave));
 }
 
 static inline void
 master_rxstart(struct i2c_bus_priv* dev, int slave)
 {
-    master_start(dev, I2CDATA_READ(slave));
+    slave = (0x41 | slave);
+    master_start(dev, slave);
+    // master_start(dev, I2CDATA_READ(slave));
 }
 
 static int
