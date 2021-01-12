@@ -634,6 +634,9 @@ ethif_imx6_init(
         enet_prom_disable(enet);
     }
 
+    /* Do not forward the Ethernet CRC sum to the network stack */
+    enet_crc_strip_enable(enet);
+
     /* Initialise the phy library */
     miiphy_init();
     /* Initialise the phy */
