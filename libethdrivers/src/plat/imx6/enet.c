@@ -568,20 +568,22 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
         return NULL;
     }
 
-    uint32_t *ccgr_enet_set = clock_base + 0x40a0;
-    uint32_t *ccgr_enet_clr = clock_base + 0x40a4;
-    uint32_t *ccgr_sim_enet_set = clock_base + 0x4400;
-    uint32_t *ccgr_sim_enet_clr = clock_base + 0x4404;
+    #define DEFINE_IMX8MQ_CLOCK_REG(_name_, _offs_) \
+        uint32_t *_name_ = (uint32_t *)((uintptr_t)clock_base + (_offs_));
+
+    DEFINE_IMX8MQ_CLOCK_REG(ccgr_enet_set,     0x40a0)
+    DEFINE_IMX8MQ_CLOCK_REG(ccgr_enet_clr,     0x40a4)
+    DEFINE_IMX8MQ_CLOCK_REG(ccgr_sim_enet_set, 0x4400)
+    DEFINE_IMX8MQ_CLOCK_REG(ccgr_sim_enet_clr, 0x4404)
+    DEFINE_IMX8MQ_CLOCK_REG(enet_axi_target,   0x8880)
+    DEFINE_IMX8MQ_CLOCK_REG(enet_ref_target,   0xa980)
+    DEFINE_IMX8MQ_CLOCK_REG(enet_timer_target, 0xaa00)
 
     /* Gate the clocks first */
     *ccgr_enet_clr = 0x3;
     *ccgr_sim_enet_clr = 0x3;
 
     /* Setup the clocks to have the proper sources/configs */
-    uint32_t *enet_axi_target = clock_base + 0x8880;
-    uint32_t *enet_ref_target = clock_base + 0xa980;
-    uint32_t *enet_timer_target = clock_base + 0xaa00;
-
     *enet_axi_target = BIT(28) | 0x01000000; // ENABLE | MUX SYS1_PLL | POST AND PRE DIVIDE BY 1
     *enet_ref_target = BIT(28) | 0x01000000; // ENABLE | MUX PLL2_DIV8 | POST AND PRE DIVIDE BY 1
     *enet_timer_target = BIT(28) | 0x01000000 | ((4) & 0x3f); // ENABLE | MUX PLL2_DIV10 | POST DIVIDE BY 4, PRE DIVIDE BY 1
