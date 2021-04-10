@@ -299,41 +299,12 @@ static clk_t *_mdc_clk_init(clk_t *clk)
     return clk;
 }
 
-static struct clock mdc_clk = {
-    .id = CLK_CUSTOM,
-    .name = "mdc_clk",
-    .priv = NULL,
-    .req_freq = 2500000UL,
-    .set_freq = &_mdc_clk_set_freq,
-    .get_freq = &_mdc_clk_get_freq,
-    .recal = &_mdc_clk_recal,
-    .init = &_mdc_clk_init,
-    .parent = NULL,
-    .sibling = NULL,
-    .child = NULL,
-};
-
-
 #ifdef CONFIG_PLAT_IMX8MQ_EVK
 
-static freq_t _enet_clk_get_freq(clk_t *clk)
+static freq_t imx8mq_enet_clk_get_freq(clk_t *clk)
 {
     return clk->req_freq;
 }
-
-static struct clock enet_clk = {
-    .id = CLK_CUSTOM,
-    .name = "enet_clk",
-    .priv = NULL,
-    .req_freq = 125000000UL,
-    .set_freq = NULL,
-    .get_freq = &_enet_clk_get_freq,
-    .recal = NULL,
-    .init = NULL,
-    .parent = NULL,
-    .sibling = NULL,
-    .child = NULL,
-};
 
 #endif
 
@@ -560,7 +531,24 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
 
 #elif defined(CONFIG_PLAT_IMX8MQ_EVK)
 
-    enet_clk_ptr = &enet_clk;
+    printf("IMX8MQ_EVK clock config\n");
+
+    static struct clock imx8mq_enet_clk = {
+        .id = CLK_CUSTOM,
+        .name = "enet_clk",
+        .priv = NULL,
+        .req_freq = 125000000UL,
+        .set_freq = NULL,
+        .get_freq = &imx8mq_enet_clk_get_freq,
+        .recal = NULL,
+        .init = NULL,
+        .parent = NULL,
+        .sibling = NULL,
+        .child = NULL,
+    };
+
+    enet_clk_ptr = &imx8mq_enet_clk;
+
     // TODO Implement an actual clock driver for the imx8mq
     void *clock_base = RESOURCE(&io_ops->io_mapper, CCM);
     if (!clock_base) {
@@ -595,6 +583,19 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
 #endif
 
     /* Set the MDIO clock frequency */
+    static struct clock mdc_clk = {
+        .id = CLK_CUSTOM,
+        .name = "mdc_clk",
+        .priv = NULL,
+        .req_freq = 2500000UL,
+        .set_freq = &_mdc_clk_set_freq,
+        .get_freq = &_mdc_clk_get_freq,
+        .recal = &_mdc_clk_recal,
+        .init = &_mdc_clk_init,
+        .parent = NULL,
+        .sibling = NULL,
+        .child = NULL,
+    };
     mdc_clk.priv = (void *)regs;
     clk_register_child(enet_clk_ptr, &mdc_clk);
     clk_set_freq(&mdc_clk, MDC_FREQ);
