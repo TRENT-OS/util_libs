@@ -82,15 +82,18 @@ if(${KernelArch} STREQUAL "arm")
     # Link the IRQ chip parser modules
     list(
         APPEND
-            irqchip_modules
-            "-Wl,--undefined=arm_gic_ptr,--undefined=tegra_ictlr_ptr,--undefined=arm_gicv3_ptr,\
---undefined=fsl_avic_ptr,--undefined=ti_omap3_ptr"
+        link_sym_undefined
+            "arm_gic_ptr"
+            "tegra_ictlr_ptr"
+            "arm_gicv3_ptr"
+            "fsl_avic_ptrti_omap3_ptr"
     )
+
 elseif(${KernelArch} STREQUAL "x86")
     target_sources(platsupport PRIVATE "src/arch/x86/delay.c" "src/arch/x86/tsc.c")
 elseif(${KernelArch} STREQUAL "riscv")
     target_sources(platsupport PRIVATE "src/arch/riscv/irqchip/plic.c")
-    list(APPEND irqchip_modules "-Wl,--undefined=riscv_plic_ptr")
+    list(APPEND link_sym_undefined "riscv_plic_ptr")
 endif()
 
 if(KernelPlatformQEMUArmVirt)
@@ -156,6 +159,10 @@ if("${KernelSel4Arch}" STREQUAL "arm_hyp")
     set(_inc_folder_KernelSel4Arch "aarch32")
 endif()
 
+foreach(sym IN LISTS link_sym_undefined)
+    target_link_options(platsupport PUBLIC "-Wl,--undefined=${sym}")
+endforeach()
+
 target_include_directories(
     platsupport
     PUBLIC
@@ -165,12 +172,4 @@ target_include_directories(
         "arch_include/${KernelArch}"
 )
 
-target_link_libraries(
-    platsupport
-    muslc
-    utils
-    fdt
-    sel4_autoconf
-    platsupport_Config
-    ${irqchip_modules}
-)
+target_link_libraries(platsupport muslc utils fdt sel4_autoconf platsupport_Config)
