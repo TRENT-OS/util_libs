@@ -160,7 +160,7 @@ if("${KernelSel4Arch}" STREQUAL "arm_hyp")
 endif()
 
 foreach(sym IN LISTS link_sym_undefined)
-    target_link_options(platsupport PUBLIC "-Wl,--undefined=${sym}")
+    target_link_options(platsupport PUBLIC "LINKER:--undefined=${sym}")
 endforeach()
 
 target_include_directories(
