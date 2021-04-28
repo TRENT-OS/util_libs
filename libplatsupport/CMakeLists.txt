@@ -42,24 +42,32 @@ elseif(NOT ${KernelArmMach} STREQUAL "")
     set(LibPlatSupportMach "${KernelArmMach}")
 endif()
 
+add_library(
+    platsupport
+    EXCLUDE_FROM_ALL
+    src/fdt.c
+    src/io.c
+    src/local_time_manager.c
+    src/serial.c
+    src/tqueue.c
+)
+
+add_config_library(platsupport "${configure_string}")
+
 file(
     GLOB
-        deps
+        platsupport_src
         CONFIGURE_DEPENDS
         src/plat/${KernelPlatform}/*.c
-        src/*.c
         src/plat/${KernelPlatform}/acpi/*.c
 )
 
-if(NOT ${LibPlatSupportMach} STREQUAL "")
-    file(GLOB lib_deps CONFIGURE_DEPENDS "src/mach/${LibPlatSupportMach}/*.c")
-    list(APPEND deps ${lib_deps})
-endif()
+target_sources(platsupport PRIVATE ${platsupport_src})
 
 if(${KernelArch} STREQUAL "arm")
-    list(
-        APPEND
-        deps
+    target_sources(
+        platsupport
+        PRIVATE
         src/arch/arm/clock.c
         src/arch/arm/delay.c
         src/arch/arm/dma330.c
@@ -79,26 +87,26 @@ if(${KernelArch} STREQUAL "arm")
 --undefined=fsl_avic_ptr,--undefined=ti_omap3_ptr"
     )
 elseif(${KernelArch} STREQUAL "x86")
-    list(APPEND deps src/arch/x86/delay.c src/arch/x86/tsc.c)
+    target_sources(platsupport PRIVATE src/arch/x86/delay.c src/arch/x86/tsc.c)
 elseif(${KernelArch} STREQUAL "riscv")
-    list(APPEND deps src/arch/riscv/irqchip/plic.c)
+    target_sources(platsupport PRIVATE src/arch/riscv/irqchip/plic.c)
     list(APPEND irqchip_modules "-Wl,--undefined=riscv_plic_ptr")
 endif()
 
 if(KernelPlatformQEMUArmVirt)
     if(KernelArmExportPCNTUser AND KernelArmExportPTMRUser)
-        list(APPEND deps src/arch/arm/generic_ltimer.c)
+        target_sources(platsupport PRIVATE src/arch/arm/generic_ltimer.c)
     endif()
 endif()
 
 if(KernelPlatformExynos5422)
-    list(APPEND deps src/mach/${LibPlatSupportMach}/clock/exynos_5422_clock.c)
+    target_sources(platsupport PRIVATE src/mach/${LibPlatSupportMach}/clock/exynos_5422_clock.c)
 elseif(KernelPlatformExynos4 OR KernelPlatformExynos5410 OR KernelPlatformExynos5250)
-    list(APPEND deps src/mach/${LibPlatSupportMach}/clock/exynos_common_clock.c)
+    target_sources(platsupport PRIVATE src/mach/${LibPlatSupportMach}/clock/exynos_common_clock.c)
 endif()
 
-if(KernelPlatImx6 OR KernelPlatformImx7Sabre)
-    list(APPEND deps src/mach/${LibPlatSupportMach}/epit/epit.c)
+if(KernelPlatImx6 OR KernelPlatformImx7Sabre OR KernelPlatformKZM)
+    target_sources(platsupport PRIVATE src/mach/${LibPlatSupportMach}/epit/epit.c)
 endif()
 
 if(
@@ -107,14 +115,17 @@ if(
     OR KernelPlatformImx8mq-evk
     OR KernelPlatformImx8mm-evk
 )
-    list(APPEND deps src/mach/${LibPlatSupportMach}/serial/serial.c)
+    target_sources(platsupport PRIVATE src/mach/${LibPlatSupportMach}/serial/serial.c)
 endif()
 
 if(KernelPlatformImx8mq-evk OR KernelPlatformImx8mm-evk)
-    list(APPEND deps src/plat/imx8m/chardev.c)
-    # There's no clock driver at the moment, but this is to allow the
-    # libethdrivers to build for imx8mq
-    list(APPEND deps src/plat/imx8m/clock.c)
+    target_sources(
+        platsupport PRIVATE src/plat/imx8m/chardev.c
+        # There's no clock driver at the moment, but this is to allow the
+        # libethdrivers to build for imx8mq
+        src/plat/imx8m/clock.c
+    )
+    target_include_directories(platsupport PUBLIC plat_include/imx8m)
 endif()
 
 if(KernelPlatPC99)
@@ -126,16 +137,6 @@ if(KernelPlatPC99)
     )
 endif()
 
-list(SORT deps)
-
-add_config_library(platsupport "${configure_string}")
-
-add_library(platsupport EXCLUDE_FROM_ALL ${deps})
-
-if(KernelPlatformImx8mq-evk OR KernelPlatformImx8mm-evk)
-    target_include_directories(platsupport PUBLIC plat_include/imx8m)
-endif()
-
 if(KernelPlatformZynqmpZcu102 OR KernelPlatformZynqmpUltra96)
     # This still needs to be cleaned up, so there is a mach folder "zynymq" and
     # the board specific folders "zcu102" and "ultra96". Then we don't need to
@@ -144,6 +145,8 @@ if(KernelPlatformZynqmpZcu102 OR KernelPlatformZynqmpUltra96)
 endif()
 
 if(NOT "${LibPlatSupportMach}" STREQUAL "")
+    file(GLOB mach_src CONFIGURE_DEPENDS src/mach/${LibPlatSupportMach}/*.c)
+    target_sources(platsupport PRIVATE ${mach_src})
     target_include_directories(platsupport PUBLIC mach_include/${LibPlatSupportMach})
 endif()
 
