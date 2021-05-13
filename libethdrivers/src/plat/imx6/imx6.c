@@ -846,7 +846,6 @@ static int allocate_irq_callback(ps_irq_t irq, unsigned curr_num,
 int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
 {
     int ret;
-    imx6_eth_driver_t *driver = NULL;
 
     /* get a configuration if function is implemented */
     const nic_config_t *nic_config = NULL;
@@ -867,31 +866,24 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
         }
     }
 
-    ret = ps_calloc(
-              &io_ops->malloc_ops,
-              1,
-              sizeof(*driver),
-              (void **) &driver);
-    if (ret) {
-        ZF_LOGE("Failed to allocate memory for the Ethernet driver, code %d", ret);
-        ret = -ENOMEM;
-        goto error;
-    }
-
-    driver->eth_drv.i_fn = (struct raw_iface_funcs) {
-        .raw_handleIRQ   = handle_irq,
-        .print_state     = print_state,
-        .low_level_init  = low_level_init,
-        .raw_tx          = raw_tx,
-        .raw_poll        = raw_poll,
-        .get_mac         = get_mac
+    imx6_eth_driver_t driver = {
+        .eth_drv = {
+            .eth_data = &driver, /* point to self */
+            .dma_alignment = DMA_ALIGN,
+            .i_fn = {
+                .raw_handleIRQ  = handle_irq,
+                .print_state    = print_state,
+                .low_level_init = low_level_init,
+                .raw_tx         = raw_tx,
+                .raw_poll       = raw_poll,
+                .get_mac        = get_mac
+            },
+        },
+        .rx.cnt = CONFIG_LIB_ETHDRIVER_RX_DESC_COUNT,
+        .tx.cnt = CONFIG_LIB_ETHDRIVER_TX_DESC_COUNT,
     };
 
-    driver->eth_drv.eth_data = driver; /* use simply extend the structure */
-    driver->eth_drv.io_ops = *io_ops;
-    driver->eth_drv.dma_alignment = DMA_ALIGN;
-    driver->tx.cnt = CONFIG_LIB_ETHDRIVER_TX_DESC_COUNT;
-    driver->rx.cnt = CONFIG_LIB_ETHDRIVER_RX_DESC_COUNT;
+    driver.eth_drv.io_ops = *io_ops;
 
     ps_fdt_cookie_t *cookie = NULL;
     ret = ps_fdt_read_path(
@@ -909,7 +901,7 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
               &io_ops->io_fdt,
               cookie,
               allocate_register_callback,
-              driver);
+              &driver);
     if (ret) {
         ZF_LOGE("Failed to walk the Ethernet device's registers and allocate them, code %d", ret);
         ret = -ENODEV;
@@ -920,7 +912,7 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
               &io_ops->io_fdt,
               cookie,
               allocate_irq_callback,
-              driver);
+              &driver);
     if (ret) {
         ZF_LOGE("Failed to walk the Ethernet device's IRQs and allocate them, code %d", ret);
         ret = -ENODEV;
@@ -934,7 +926,7 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
         goto error;
     }
 
-    ret = init_device(driver, nic_config);
+    ret = init_device(&driver, nic_config);
     if (ret) {
         ZF_LOGE("Failed to initialise the Ethernet driver, code %d", ret);
         ret = -ENODEV;
@@ -944,7 +936,7 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
     ret = ps_interface_register(
               &io_ops->interface_registration_ops,
               PS_ETHERNET_INTERFACE,
-              driver,
+              &driver,
               NULL);
     if (ret) {
         ZF_LOGE("Failed to register Ethernet driver interface, code %d", ret);
@@ -956,13 +948,7 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
 
 error:
     ZF_LOGI("Cleaning up failed driver initialization");
-
-    if (driver) {
-        ps_free(&io_ops->malloc_ops, sizeof(*driver), driver);
-    }
-
     return ret;
-
 }
 
 static const char *compatible_strings[] = {
