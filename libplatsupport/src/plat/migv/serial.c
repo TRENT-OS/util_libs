@@ -93,7 +93,7 @@ int uart_putchar(
     ps_chardevice_t* dev,
     int c)
 {
-    // printf("uart_putchar() called\n");
+    printf("uart_putchar() called\n");
     uart_do_putchar(dev,c);
     if (c == '\n') {
         uart_do_putchar(dev,'r');
@@ -125,6 +125,25 @@ static void uart_handle_irq(
          printf("overrun error detected\n");
          regs->lsr |= ~BIT(1);
     }
+
+
+    // ToDo: implement me
+    // printf("!!!!!!!!!!!!!!!!!uart_handle_irq called in serial.c\n");
+
+    // printf("uart_handle_irq\n");
+    // uart_regs_t* regs = uart_get_regs(dev);
+    // uint32_t c = -1;
+
+    // printf("LSR = %u\n", regs->lsr);
+    // printf("LBR_DLL_THR = %u\n", regs->rbr_dll_thr);
+    // printf("regs->lsr & UART_LSR_RX = %d\n", regs->lsr & UART_LSR_RX);
+
+    /* if UART is empty return an error */
+    // if (regs->lsr & UART_LSR_RX) {
+    //      c = regs->rbr_dll_thr;
+    // }
+
+    // printf("uart_handle_irq with value %u\n", c);
 }
 
 int uart_init(
@@ -132,6 +151,7 @@ int uart_init(
     const ps_io_ops_t *ops,
     ps_chardevice_t *dev)
 {
+    printf("uart_init()");
     void *vaddr = chardev_map(defn, ops);
     if (!vaddr) {
         return -1;

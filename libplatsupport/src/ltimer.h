@@ -37,7 +37,9 @@ static inline void handle_irq_wrapper(void *data, ps_irq_acknowledge_fn_t acknow
     int UNUSED error = irq_handler(ltimer->data, irq);
     assert(!error);
 
+    ZF_LOGE("before ACK in handle_irq_wrapper() for IRQ = %lu\n", irq->irq.number);
     error = acknowledge_fn(ack_data);
+    ZF_LOGE("after ACK in handle_irq_wrapper() for IRQ = %lu\n", irq->irq.number);
     assert(!error);
 }
 

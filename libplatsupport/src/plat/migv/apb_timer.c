@@ -85,80 +85,29 @@ void apb_timer_handle_irq(apb_timer_t *apb_timer, uint32_t irq)
 
 uint64_t apb_timer_get_time(apb_timer_t *apb_timer)
 {
-    int count = 0;
+    // int count = 0;
 
-    for (;;) {
-        uint64_t time_h1 = (volatile uint64_t) apb_timer->time_h;
-        uint32_t time1 = apb_timer->apb_timer_map->time;
-        uint64_t time_h2 = (volatile uint64_t) apb_timer->time_h;
-        uint32_t time2 = apb_timer->apb_timer_map->time;
+    // for (;;) {
+    //     uint64_t time_h1 = (volatile uint64_t) apb_timer->time_h;
+    //     uint32_t time1 = apb_timer->apb_timer_map->time;
+    //     uint64_t time_h2 = (volatile uint64_t) apb_timer->time_h;
+    //     uint32_t time2 = apb_timer->apb_timer_map->time;
 
-        if((time_h1 == time_h2) && (time2 > time1)) {
-            ZF_LOGD("time1 vs time2 -> %u  <-> %u, count = %d, time_h2 = %" PRIu64, time1, time2, count, time_h2);
+    //     if((time_h1 == time_h2) && (time2 > time1)) {
+    //         ZF_LOGD("time1 vs time2 -> %u  <-> %u, count = %d, time_h2 = %" PRIu64, time1, time2, count, time_h2);
+    //         uint64_t time_temp = (time2 + (time_h2 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
+    //         ZF_LOGD("time_temp = %" PRIu64, time_temp);
+    //         return time_temp;
+    //     }
+
+    //     count++;
+    // }
+
+            uint64_t time_h2 = (volatile uint64_t) apb_timer->time_h;
+            uint32_t time2 = apb_timer->apb_timer_map->time;
             uint64_t time_temp = (time2 + (time_h2 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
             ZF_LOGD("time_temp = %" PRIu64, time_temp);
             return time_temp;
-        }
-
-        count++;
-    }
-
-
-    // ZF_LOGD("MSB -> %lu \n", (uint32_t)((time1 >> 24) ^ (time2 >> 24)));
-    // if ((uint32_t)((time1 >> 24) ^ (time2 >> 24))) { // MSB has changed
-    //     time_temp = (time2 + ((time_h1 + 1) * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-    //     ZF_LOGD("!!!!!!!!!!!!!!! MSB has changed !!!!!!!!!!!!!!!!!!\n");
-    // }
-    // else
-        // time_temp = (time2 + (time_h1 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-
-
-
-
-    // if(time_h1 != time_h2) {
-    //     if ((uint32_t)(time >> 24) == 0) // MSB has changed
-    //         time_temp = (time + (time_h2 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-    //     else
-    //         time_temp = (time + (time_h1 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-    // }
-    // else
-    //     time_temp = (time + (time_h1 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-
-
-
-
-
-    // if ((uint32_t)((time1 >> 24) ^ (time2 >> 24)) // MSB has changed
-    //     time2 &= 0xFF000000;
-    // else if ((uint32_t)((time1 >> 16) ^ (time2 >> 16))
-    //     time2 &= 0xFFFF0000;
-    // else if ((uint32_t)((time1 >> 8) ^ (time2 >> 8))
-    //     time2 &= 0xFFFFFF00;
-
-
-
-
-    // for(;;) {
-    //     uint64_t time_h1 = (volatile uint64_t) apb_timer->time_h;
-    //     uint64_t time = apb_timer->apb_timer_map->time;
-    //     // uint64_t time_h2 = (volatile uint64_t) apb_timer->time_h;
-    //     // uint64_t time_h3 = time_h1;
-
-    //     // if((time_h1 > 0) && (time_h1 == time_h2) && ((time < 3000000) || (time > (0xFFFFFFFF - 3000000)))) {
-    //     //     ZF_LOGD("overflow detected but irq too slow... -> %" PRIu64 "\n", time);
-    //     //     time_h3++;
-    //     // }
-
-    //     uint64_t time_temp = (time + (time_h1 * 0xFFFFFFFF)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-    //     ZF_LOGD("time_temp = %" PRIu64 "\n", time_temp);
-    //     return time_temp;
-
-    //     // if(apb_timer->apb_timer_map->time > time  &&  ) {
-    //     //     uint64_t time_temp = (time + (time_h1 << 32)) * (NS_IN_S / APB_TIMER_INPUT_FREQ);
-    //     //     ZF_LOGD("time_temp = %" PRIu64 "\n", time_temp);
-    //     //     return time_temp;
-    //     // }
-    // }
 }
 
 int apb_timer_init(apb_timer_t *apb_timer, apb_timer_config_t config)
