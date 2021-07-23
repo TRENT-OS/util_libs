@@ -1,5 +1,6 @@
 /*
  * Copyright 2020, Data61, CSIRO (ABN 41 687 119 230)
+ * Copyright 2019-2021, HENSOLDT Cyber
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -75,6 +76,7 @@ static int parse_riscv_plic_interrupts(char *dtb_blob, int node_offset, int intr
 
 char *riscv_plic_compatible_list[] = {
     "riscv,plic0",
+    "migv-1.0,plic",
     NULL
 };
 DEFINE_IRQCHIP_PARSER(riscv_plic, riscv_plic_compatible_list, parse_riscv_plic_interrupts);
