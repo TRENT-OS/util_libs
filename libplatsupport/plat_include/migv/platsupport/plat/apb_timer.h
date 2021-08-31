@@ -23,11 +23,6 @@
 #define APB_TIMER_IRQ_OVF(n)    APB_TIMER_PLIC_BASE + 2*n + 0x0
 #define APB_TIMER_IRQ_CMP(n)    APB_TIMER_PLIC_BASE + 2*n + 0x1
 
-// /* Multiple timers */
-// #define APB_TIMER_DIST      0x10
-// #define APB_TIMER_NUM       2
-// #define APB_TIMER_BASE(n)   APB_TIMER_DIST * n
-
 #define CMP_WIDTH               32
 #define APB_TIMER_CTRL_ENABLE   BIT(0);
 #define CMP_MASK                MASK(CMP_WIDTH)

@@ -72,6 +72,7 @@ static int get_nth_irq(void *data, size_t n, ps_irq_t *irq)
     assert(n < N_IRQS);
 
     *irq = irqs[n];
+
     return 0;
 }
 
@@ -84,6 +85,7 @@ static int get_nth_pmem(void *data, size_t n, pmem_region_t *paddr)
 {
     assert(n < N_PMEMS);
     *paddr = pmems[n];
+
     return 0;
 }
 
@@ -102,7 +104,6 @@ static int ltimer_handle_irq(void *data, ps_irq_t *irq)
             event = LTIMER_OVERFLOW_EVENT;
             break;
         case APB_TIMER_IRQ_CMP(1):
-            ZF_LOGD("Timeout IRQ number: %d received.", irq_number);
             apb_timer_stop(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer);
             event = LTIMER_TIMEOUT_EVENT;
             break;
@@ -128,6 +129,7 @@ static int get_time(void *data, uint64_t *time)
     migv_ltimers_t *timers = data;
 
     *time = apb_timer_get_time(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer);
+
     return 0;
 }
 
@@ -143,27 +145,20 @@ static int set_timeout(void *data, uint64_t ns, timeout_type_t type)
 
     switch (type) {
     case TIMEOUT_ABSOLUTE: {
-        // ZF_LOGD("set_timeout() in ltimer called with TIMEOUT_ABSOLUTE \n");
         uint64_t time = apb_timer_get_time(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer);
-        // ZF_LOGD("time = %" PRIu64 " vs. ns = %" PRIu64 "\n", time, ns);
         if (time >= ns) {
-            ZF_LOGD("ETIME error !!!!!!!!!!!!!!!!!!!!!\n");
             return ETIME;
         }
-        ZF_LOGD("set_timeout() TIMEOUT_ABSOLUTE ns = %" PRIu64 " and time = %" PRIu64 " and ns - time = %" PRIu64, ns, time, ns - time);
         apb_timer_set_timeout(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer, ns - time, false);
         return 0;
     }
     case TIMEOUT_RELATIVE: {
-        ZF_LOGD("set_timeout() TIMEOUT_RELATIVE ns = %" PRIu64, ns);
         return apb_timer_set_timeout(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer, ns, false);
     }
     case TIMEOUT_PERIODIC: {
-        ZF_LOGD("set_timeout() TIMEOUT_PERIODIC ns = %" PRIu64, ns);
         return apb_timer_set_timeout(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer, ns, true);
     }
     default:
-        ZF_LOGD("set_timeout() INVALID Type");
         break;
     }
 
@@ -172,19 +167,18 @@ static int set_timeout(void *data, uint64_t ns, timeout_type_t type)
 
 static int reset(void *data)
 {
-    ZF_LOGD("reset() called \n");
     assert(data != NULL);
     migv_ltimers_t *timers = data;
     apb_timer_stop(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer);
     apb_timer_start(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer);
     apb_timer_stop(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer);
     apb_timer_start(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer);
+
     return 0;
 }
 
 static void destroy(void *data)
 {
-    ZF_LOGD("destroy() called \n");
     assert(data);
     migv_ltimers_t *timers = data;
 
@@ -204,7 +198,6 @@ static void destroy(void *data)
 
 static int create_ltimer(ltimer_t *ltimer, ps_io_ops_t ops)
 {
-    ZF_LOGD("create_ltimer() called \n");
     assert(ltimer != NULL);
     ltimer->get_time = get_time;
     ltimer->get_resolution = get_resolution;
@@ -223,7 +216,6 @@ static int create_ltimer(ltimer_t *ltimer, ps_io_ops_t ops)
 
 static int init_ltimer(ltimer_t *ltimer)
 {
-    ZF_LOGD("init_ltimer() called \n");
     assert(ltimer != NULL);
     migv_ltimers_t *timers = ltimer->data;
 
@@ -238,13 +230,12 @@ static int init_ltimer(ltimer_t *ltimer)
     apb_timer_init(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer, config_counter);
     apb_timer_init(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer, config_timeout);
     apb_timer_start(&timers->apb_timer_ltimers[COUNTER_TIMER].apb_timer);
-    // apb_timer_start(&timers->apb_timer_ltimers[TIMEOUT_TIMER].apb_timer);
+
     return 0;
 }
 
 int ltimer_default_init(ltimer_t *ltimer, ps_io_ops_t ops, ltimer_callback_fn_t callback, void *callback_token)
 {
-    ZF_LOGD("ltimer_default_init() called \n");
     int error = ltimer_default_describe(ltimer, ops);
     if (error) {
         return error;
@@ -288,6 +279,7 @@ int ltimer_default_init(ltimer_t *ltimer, ps_io_ops_t ops, ltimer_callback_fn_t 
         destroy(ltimer->data);
         return error;
     }
+
     /* success! */
     return 0;
 }
@@ -303,5 +295,6 @@ int ltimer_default_describe(ltimer_t *ltimer, ps_io_ops_t ops)
     ltimer->get_nth_irq = get_nth_irq;
     ltimer->get_num_pmems = get_num_pmems;
     ltimer->get_nth_pmem = get_nth_pmem;
+
     return 0;
 }
