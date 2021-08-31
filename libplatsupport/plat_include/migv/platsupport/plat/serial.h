@@ -33,7 +33,7 @@ enum chardev_id {
 #define UART_IER_ETBEI   (1u << 1)   // ETBEI bit in IER reg
 
 #define UART_LSR_RX      (1u << 0)   //UART_LSR_DR_MASK
-#define UART_LSR_TX      (1u << 5)   // UART_LSR_TEMT_MASK
+#define UART_LSR_TX      (1u << 5)   // UART_LSR_THRNF_MASK
 
 
 struct uart {

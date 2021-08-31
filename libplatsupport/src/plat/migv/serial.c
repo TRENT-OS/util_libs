@@ -23,28 +23,6 @@ static uart_regs_t* uart_get_regs(
     return (uart_regs_t*)d->vaddr;
 }
 
-// static int internal_uart_is_rx_fifo_empty(
-//     uart_regs_t* regs)
-// {
-//     // ToDo: implement me
-//     return 0;
-// }
-//
-// static int internal_uart_is_tx_fifo_full(
-//     uart_regs_t* regs)
-// {
-//     // ToDo: implement me
-//     return 0;
-// }
-//
-// static int internal_uart_tx_byte(
-//     uart_regs_t* regs,
-//     uint8_t c)
-// {
-//     // ToDo: implement me
-//     // regs->txdata = c
-// }
-
 /*
  *******************************************************************************
  * UART access API
@@ -54,24 +32,13 @@ static uart_regs_t* uart_get_regs(
 int uart_getchar(
     ps_chardevice_t *dev)
 {
-    // printf("uart_getchar");
     uart_regs_t* regs = uart_get_regs(dev);
-    int c = -1;
-
-    static uint8_t expected = 0;
 
     /* if UART is empty return an error */
-    if (regs->lsr & UART_LSR_RX) {
-        c = regs->rbr_dll_thr;
-        if((uint8_t) c == expected)
-            expected++;
-        // else {
-        //     printf("c = %x and expected = %x, lsr = %x\n", c, expected, regs->lsr);
-        // }
-    }
+    if (!(regs->lsr & UART_LSR_RX))
+        return -1;
 
-    // printf("uart_getchar with %d\n", c);
-    return c;
+    return (uint8_t)(regs->rbr_dll_thr & 0xFF);
 }
 
 void uart_do_putchar(
@@ -93,23 +60,10 @@ int uart_putchar(
     ps_chardevice_t* dev,
     int c)
 {
-    // printf("uart_putchar() called\n");
     uart_do_putchar(dev,c);
     if (c == '\n') {
         uart_do_putchar(dev,'r');
     }
-
-    // if (byte == '\n') {
-    //     internal_uart_tx_byte(regs, '\r');
-    //     /* If SERIAL_AUTO_CR is enabled, we assume this UART is used as a
-    //      * console, so blocking is fine here.
-    //      */
-    //     while (internal_uart_is_tx_fifo_full(regs)) {
-    //         /* busy waiting loop */
-    //     }
-    // }
-
-    // internal_uart_tx_byte(regs, byte);
 
     return c;
 }
@@ -117,14 +71,7 @@ int uart_putchar(
 static void uart_handle_irq(
     ps_chardevice_t* dev)
 {
-    // printf("uart_handle_irq() called\n");
-    uart_regs_t* regs = uart_get_regs(dev);
-
-    /* check for overrun error */
-    if (regs->lsr & BIT(1)) {
-         printf("overrun error detected\n");
-         regs->lsr |= ~BIT(1);
-    }
+    // nothing to do here
 }
 
 int uart_init(
@@ -151,19 +98,18 @@ int uart_init(
 
     uart_regs_t* regs = uart_get_regs(dev);
 
-    // ToDo: implement UART initialization
-
-    /* Line configuration */
-    // serial_configure(dev, 115200, 8, PARITY_NONE, 1);
-
-    uint16_t clk_counter = 129; // on the MiG-V 1.0 Evaluation Board
-
+    uint16_t clk_counter = 195; // limit UART to baud rate of 76800 on the MiG-V 1.0 Evaluation Board
     regs->lcr = 0x80; // DLAB=1 (baud rate divisor setup)
-    regs->dlm_ier = (clk_counter >> 8) & 0xFF;
-    regs->rbr_dll_thr = clk_counter & 0xFF;
-    regs->iir_fcr = 0x27; // enables, resets and clears FIFO -> 1 IRQ per character
-    regs->lcr = 0x03; // 8N1, DLAB=0
-    regs->dlm_ier = (regs->dlm_ier & (~0xF)) | 0x1; // enable interrupts
+    // clock configuration
+    regs->dlm_ier = (clk_counter >> 8) & 0xFF; // divisor latch MSB
+    regs->rbr_dll_thr = clk_counter & 0xFF; // divisor latch LSB
+    // enables FIFO, resets RX and TX FIFO, enables 64 byte FIFO and
+    // sets receiver trigger to 32 bytes (minimum level for success in test was 16 bytes)
+    regs->iir_fcr = 0xA7;
+    // set communication parameters
+    regs->lcr = 0x3; // 8N1, DLAB=0
+     // enable interrupts (only receive interrupt, as transmit interrupt currently seems to block)
+    regs->dlm_ier = (regs->dlm_ier & (~0xF)) | 0x1;
 
     return 0;
 }
