@@ -6,6 +6,7 @@
  #pragma once
 
 #include <platsupport/timer.h>
+#include <platsupport/clock.h>
 
 #define SP804_TIMER_IRQ          32
 
@@ -39,13 +40,13 @@ typedef struct {
     void *vaddr;
 } spt_config_t;
 
-UNUSED static timer_properties_t spt_properties = {
+/*static timer_properties_t spt_properties = {
     .upcounter = false,
     .timeouts = true,
     .relative_timeouts = true,
     .irqs = 1,
     .bit_width = 32
-};
+};*/
 
 int spt_init(spt_t *spt, spt_config_t config);
 uint64_t spt_get_time(spt_t *spt);
