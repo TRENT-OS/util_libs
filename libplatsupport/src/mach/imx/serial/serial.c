@@ -215,40 +215,24 @@ int serial_configure(
     return 0;
 }
 
-int uart_init(
-    const struct dev_defn *defn,
-    const ps_io_ops_t *ops,
-    ps_chardevice_t *dev)
+static int imx6_uart_init(ps_chardevice_t *dev)
 {
-    /* Attempt to map the virtual address, assure this works */
-    void *vaddr = chardev_map(defn, ops);
-    if (vaddr == NULL) {
-        return -1;
-    }
-
-    memset(dev, 0, sizeof(*dev));
-
-    /* Set up all the  device properties. */
-    dev->id         = defn->id;
-    dev->vaddr      = (void *)vaddr;
-    dev->read       = &uart_read;
-    dev->write      = &uart_write;
-    dev->handle_irq = &uart_handle_irq;
-    dev->irqs       = defn->irqs;
-    dev->ioops      = *ops;
-    dev->flags      = SERIAL_AUTO_CR;
+    assert(NULL != dev);
 
     imx_uart_regs_t *regs = imx_uart_get_priv(dev);
 
     /* Software reset */
     regs->cr2 &= ~UART_CR2_SRST;
-    while (!(regs->cr2 & UART_CR2_SRST));
+    while (!(regs->cr2 & UART_CR2_SRST))
+    {
+        /* busy loop */
+    }
 
     /* Line configuration */
     serial_configure(dev, 115200, 8, PARITY_NONE, 1);
 
     /* Enable the UART */
-    regs->cr1 |= UART_CR1_UARTEN;                /* Enable The uart.                  */
+    regs->cr1 |= UART_CR1_UARTEN;                /* Enable the uart.                  */
     regs->cr2 |= UART_CR2_RXEN | UART_CR2_TXEN;  /* RX/TX enable                      */
     regs->cr2 |= UART_CR2_IRTS;                  /* Ignore RTS                        */
     regs->cr3 |= UART_CR3_RXDMUXDEL;             /* Configure the RX MUX              */
@@ -264,13 +248,102 @@ int uart_init(
     /* The UART1 on the IMX6 has the problem that the MUX is not correctly set,
      * and the RX PIN is not routed correctly.
      */
-    if ((defn->id == IMX_UART1) && mux_sys_valid(&ops->mux_sys)) {
-        if (mux_feature_enable(&ops->mux_sys, MUX_UART1, 0)) {
+    if ((dev->id == IMX_UART1) && mux_sys_valid(&dev->ioops.mux_sys)) {
+        if (mux_feature_enable(&dev->ioops.mux_sys, MUX_UART1, 0)) {
             /* Failed to configure the mux */
+            ZF_LOGE("failed to configure MUX");
             return -1;
         }
     }
 #endif
 
     return 0;
+}
+
+static void imx6_uart_dev_init(
+    ps_chardevice_t *dev,
+    const ps_io_ops_t *ops,
+    enum chardev_id id,
+    void *vaddr,
+    const int *irqs)
+{
+    assert(NULL != dev);
+
+    memset(dev, 0, sizeof(*dev));
+
+    /* Set up all the  device properties. */
+    dev->id         = id;
+    dev->vaddr      = vaddr;
+    dev->irqs       = irqs;
+
+    dev->read       = &uart_read;
+    dev->write      = &uart_write;
+    dev->handle_irq = &uart_handle_irq;
+    dev->ioops      = *ops;
+
+    dev->flags      = SERIAL_AUTO_CR;
+}
+
+int uart_init(
+    const struct dev_defn *defn,
+    const ps_io_ops_t *ops,
+    ps_chardevice_t *dev)
+{
+    assert(NULL != defn);
+    assert(NULL != ops);
+    assert(NULL != dev);
+
+    /* Attempt to map the virtual address, assure this works */
+    void *vaddr = chardev_map(defn, ops);
+    if (vaddr == NULL) {
+        ZF_LOGE("chardev_map() failed");
+        return -1;
+    }
+
+    imx6_uart_dev_init(dev, ops, defn->id, vaddr, defn->irqs);
+
+    return imx6_uart_init(dev);
+}
+
+int uart_static_init(
+    void *vaddr,
+    const ps_io_ops_t *ops,
+    ps_chardevice_t *dev)
+{
+    assert(NULL != vaddr);
+    assert(NULL != ops);
+    assert(NULL != dev);
+
+    /* For now, the purpose of this function is to make this driver usable
+     * from a CAmkES component, where the memory mapping and interrupt setup
+     * has been done already in the CAmkES system configuration. Since we
+     * currently use UART1 there, it's also hard-coded here. Ideally, we would
+     * also pass the ID here besides just vaddr. If we can't change the
+     * function signature, passing it in the "dev" parameter would also work.
+     * One day the whole code should to be refactored to work smoother with
+     * CAmkES or a stand-alone static setup.
+     */
+    imx6_uart_dev_init(dev, ops, IMX_UART1, vaddr, NULL);
+
+    return imx6_uart_init(dev);
+
+}
+
+ps_chardevice_t*
+ps_cdev_static_init(
+    const ps_io_ops_t *ops,
+    ps_chardevice_t* dev,
+    void *params)
+{
+    assert(NULL != ops);
+    assert(NULL != dev);
+
+    if (params == NULL) {
+        ZF_LOGE("params must no be NULL");
+        return NULL;
+    }
+
+    void* vaddr = params;
+
+    return uart_static_init(vaddr, ops, dev) ? NULL : dev;
 }
