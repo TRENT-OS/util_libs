@@ -14,8 +14,8 @@
  * and using one timer on each page saves us from identifying the sources of
  * interrupts.
  * */
-#define SP804_TIMER1_PATH "/sp804@b001000"
-#define SP804_TIMER2_PATH "/sp804@b000000"
+#define SP804_TIMER1_PATH "/sp804@90c0000"
+#define SP804_TIMER2_PATH "/sp804@90d0000"
 
 #define SP804_REG_CHOICE 0
 #define SP804_IRQ_CHOICE 0
