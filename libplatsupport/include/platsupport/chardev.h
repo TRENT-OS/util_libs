@@ -155,12 +155,14 @@ static inline ssize_t ps_cdev_read(ps_chardevice_t* d, void* data, size_t size,
  * @param[in]  token    An anonymous pointer to pass, unmodified, to the provided
  *                      callback function.
  * @return              Returns the number of bytes written on succes, negative
- *                      values reprents an error. If a callback function is
- *                      provided, a return value of 0 will represent success
- *                      If no callback funtion is provided, this function will
- *                      write data to any internal fifos to meet the the request
- *                      and then return. It will not block until the requested
- *                      number of bytes have been written.
+ *                      values represent an error. If a callback function is
+ *                      provided and the size if greater 0, a return value of
+ *                      0 will represent success and the callback will be
+ *                      invoked for report the result. If no callback is
+ *                      provided, this function behavior depends on the device
+ *                      configuration. It may write less data than requested and
+ *                      return the number of bytes written. It may also block
+ *                      untiol all requested bytes are written.
  */
 static inline ssize_t ps_cdev_write(ps_chardevice_t* d, void* data, size_t size,
                                     chardev_callback_t callback, void* token)
