@@ -379,44 +379,37 @@ tk1_uart_write(ps_chardevice_t* d, const void* vdata,
                            size_t count, chardev_callback_t rcb,
                            void* token)
 {
-    struct chardev_xmit_descriptor wd = {
-        .callback = rcb,
-        .token = token,
-        .bytes_transfered = 0,
-        .bytes_requested = count,
-        .data = (void *)vdata
-    };
+    if (tk1_uart_is_async(d)) {
+        /* Interrupt and callback is not used of there is no data */
+        if (count > 0) {
 
-    d->write_descriptor = wd;
+            THREAD_MEMORY_ACQUIRE();
+            if (d->write_descriptor.bytes_transfered < d->write_descriptor.bytes_requested) {
+                ZF_LOGE("older async write request still pending.");
+                return -1; /* older request still pending */
+            }
 
-    if (count == 0) {
-        /* Call the callback immediately */
-        if (rcb != NULL) {
-            rcb(d, CHARDEV_STAT_COMPLETE, count, token);
+            d->write_descriptor = (struct chardev_xmit_descriptor) {
+                .callback = rcb,
+                .token = token,
+                .bytes_transfered = 0,
+                .bytes_requested = count,
+                .data = (void *)vdata
+            };
+            tk1_uart_set_thr_irq(tk1_uart_get_priv(d), true);
+            THREAD_MEMORY_RELEASE();
         }
         return 0;
     }
 
-    if (!tk1_uart_is_async(d)) {
-        /* Write the data out over the line synchronously. */
-        for (int i = 0; i < count; i++) {
-            while (uart_putchar(d, ((uint8_t *)vdata)[i]) == -1) {
-            }
-
-            d->write_descriptor.bytes_transfered++;
+    /* Write the data out over the line synchronously. */
+    for (int i = 0; i < count; i++) {
+        while (uart_putchar(d, ((uint8_t *)vdata)[i]) == -1) {
+            /* blocking wait */
         }
-
-        if (rcb != NULL) {
-            rcb(d, CHARDEV_STAT_COMPLETE, d->write_descriptor.bytes_transfered,
-                token);
-        }
-    } else {
-        /* Else enable the THRE IRQ and return. */
-        tk1_uart_set_thr_irq(tk1_uart_get_priv(d), true);
-        THREAD_MEMORY_RELEASE();
     }
 
-    return d->write_descriptor.bytes_transfered;
+    return count;
 }
 
 static ssize_t
