@@ -250,6 +250,7 @@ static freq_t _arm_get_freq(clk_t *clk)
     /* clock output enabled? */
     if (!(v & PLL_ENABLE)) {
         /* we should never be here, because we are running on the ARM core */
+        ZF_LOGI("clock '%s' output not enabled", clk->name);
         return 0;
     }
 
@@ -274,6 +275,7 @@ static freq_t _arm_get_freq(clk_t *clk)
     /* PLL enabled, but powered down? */
     if (v & PLL_PWR_DOWN) {
         /* we should never be here, because we are running on the ARM core */
+        ZF_LOGI("PLL for clock '%s' powered down", clk->name);
         return 0;
     }
 
@@ -331,12 +333,20 @@ static void _arm_recal(clk_t *clk UNUSED)
 
 static clk_t *_arm_init(clk_t *clk)
 {
+    // ZF_LOGI("enter");
     if (clk->priv == NULL) {
         clk_t *parent;
         parent = clk_get_clock(clk_get_clock_sys(clk), CLK_MASTER);
         clk_register_child(parent, clk);
         clk->priv = (void *)&clk_regs;
     }
+
+    if (!clk_regs.alg) {
+        ZF_LOGE("clk_regs.alg is NULL, clocks not initialised properly");
+        return 0;
+    }
+    ZF_LOGI("clock '%s': 0x%08x", clk->name, clk_regs.alg->pll_arm.val);
+
     return clk;
 }
 
@@ -360,6 +370,7 @@ static freq_t _enet_get_freq(clk_t *clk)
 
     /* clock output enabled? */
     if (!(v & PLL_ENABLE)) {
+        ZF_LOGI("clock '%s': output not enabled", clk->name);
         return 0;
     }
 
@@ -383,6 +394,7 @@ static freq_t _enet_get_freq(clk_t *clk)
 
     /* PLL enabled, but powered down? */
     if (v & PLL_PWR_DOWN) {
+        ZF_LOGI("clock '%s': PLL powered down", clk->name);
         return 0;
     }
 
@@ -473,8 +485,9 @@ static freq_t _enet_set_freq(clk_t *clk, freq_t hz)
 
     /* ENET requires enet_clk_root to be at least 133 MHz. However, we don't do
      * anything here and just trust u-boot to have set things up properly.
-     *
-     * clk_regs.ccm->chsccdr = 0x00021148
+     */
+    ZF_LOGI("CCM_CHSCCDR = 0x%x", clk_regs.ccm->chsccdr);
+    /* clk_regs.ccm->chsccdr = 0x00021148
      *    15:17 Selector for ENET root clock pre-multiplexer, derive clock from
      *            b000 PLL2
      *            b001 pll3_sw_clk
@@ -492,14 +505,16 @@ static freq_t _enet_set_freq(clk_t *clk, freq_t hz)
      *            b011 ldb_di0_clk
      *            b100 ldb_di1_clk
      *            b101-b111 Reserved
-     *
-     * CCM_CCGR3 relevant for ENETs:
+     */
+    ZF_LOGI("CCM_CCGR3 = 0x%x", clk_regs.ccm->ccgr[3]);
+    /* CCM_CCGR3 relevant for ENETs:
      *    18    ENET2_TX_CLK_DIR = 0 (disable ENET2 TX_CLK output driver)
      *    17    ENET1_TX_CLK_DIR = 1 (enable ENET2 TX_CLK output driver)
      *    14    ENET2_CLK_SEL = 0 (ENET2 TX reference clock driven by ref_enetpll1)
      *    13    ENET1_CLK_SEL = 0 (ENET1 TX reference clock driven by ref_enetpll0)
-     *
-     * CCM_ANALOG_PLL_ENETn = 0x8030200f, relevant bits for ENETs:
+     */
+    ZF_LOGI("CCM_ANALOG_PLL_ENETn = 0x%x", clk_regs.alg->pll_enet.val);
+    /* CCM_ANALOG_PLL_ENETn = 0x8030200f, relevant bits for ENETs:
      *     31  PLL LOCK = 1
      *     21  ENET_25M_REF_EN = 1
      *     20  ENET2_125M_EN = 1
@@ -533,6 +548,24 @@ static clk_t *_enet_init(clk_t *clk)
         clk_register_child(parent, clk);
         clk->priv = (void *)&clk_regs;
     }
+
+    if (!clk_regs.alg) {
+        ZF_LOGE("clk_regs.alg not set, clocks not initialised properly");
+    }
+    else {
+        uint32_t v = clk_regs.alg->pll_enet.val;
+        ZF_LOGI(
+            "clock '%s': 0x%08x (LOCK=%d, BYPASS=%d, SRC=%d, EN=%d, PWRDN=%d, DIV=%d)",
+            clk->name,
+            v,
+            0 != (v & PLL_LOCK),
+            0 != (v & PLL_BYPASS),
+            PLL_GET_BYPASS_SRC(v),
+            0 != (v & PLL_ENABLE),
+            0 != (v & PLL_PWR_DOWN),
+            PLL_ENET_GET_DIV(v) );
+    }
+
     return clk;
 }
 
@@ -556,6 +589,7 @@ static freq_t _pll_sys_get_freq(clk_t *clk)
 
     /* clock output enabled? */
     if (!(v & PLL_ENABLE)) {
+        ZF_LOGI("clock '%s' output not enabled", clk->name);
         return 0;
     }
 
@@ -579,6 +613,7 @@ static freq_t _pll_sys_get_freq(clk_t *clk)
 
     /* PLL enabled, but powered down? */
     if (v & PLL_PWR_DOWN) {
+        ZF_LOGI("PLL for clock '%s' powered down", clk->name);
         return 0;
     }
 
@@ -666,6 +701,24 @@ static clk_t *_pll_sys_init(clk_t *clk)
     // the 528 MHz PLL must be done manually somewhere. Note that if U-Boot is
     // used, it may have done this already.
 
+    if (!clk_regs.alg) {
+        ZF_LOGE("clk_regs.alg not set, clocks not initialised properly");
+    }
+    else {
+        uint32_t v = clk_regs.alg->pll_sys.val;
+        // after reset, we see LOCK=1, BYPASS=1, SRC=0, EN=1, PWRDN=1, DIV=1
+        ZF_LOGI(
+            "clock '%s': 0x%08x (LOCK=%d, BYPASS=%d, SRC=%d, EN=%d, PWRDN=%d, DIV=%d)",
+            clk->name,
+            v,
+            0 != (v & PLL_LOCK),
+            0 != (v & PLL_BYPASS),
+            PLL_GET_BYPASS_SRC(v),
+            0 != (v & PLL_ENABLE),
+            0 != (v & PLL_PWR_DOWN),
+            PLL_SYS_GET_DIV(v) );
+    }
+
     return clk;
 }
 
@@ -716,6 +769,7 @@ static void _mmdc_ch0_recal(clk_t *clk UNUSED)
 
 static clk_t *_mmdc_ch0_init(clk_t *clk)
 {
+    ZF_LOGI("enter");
     if (clk->parent == NULL) {
         clk_t *parent = clk_get_clock(clk_get_clock_sys(clk), CLK_PLL2);
         clk_register_child(parent, clk);
@@ -770,6 +824,7 @@ static void _ahb_recal(clk_t *clk UNUSED)
 
 static clk_t *_ahb_init(clk_t *clk)
 {
+    ZF_LOGI("enter");
     if (clk->parent == NULL) {
         clk_t *parent = clk_get_clock(clk_get_clock_sys(clk), CLK_MMDC_CH0);
         clk_register_child(parent, clk);
@@ -818,6 +873,7 @@ static void _ipg_recal(clk_t *clk UNUSED)
 
 static clk_t *_ipg_init(clk_t *clk)
 {
+    ZF_LOGI("enter");
     if (clk->parent == NULL) {
         clk_t *parent = clk_get_clock(clk_get_clock_sys(clk), CLK_AHB);
         clk_register_child(parent, clk);
@@ -859,6 +915,7 @@ static freq_t _usb_get_freq(clk_t *clk)
 
     /* clock output enabled? */
     if (!(v & PLL_ENABLE)) {
+        ZF_LOGI("clock '%s' output not enabled", clk->name);
         return 0;
     }
 
@@ -882,6 +939,7 @@ static freq_t _usb_get_freq(clk_t *clk)
 
     /* PLL enabled, but powered down? */
     if (v & PLL_PWR_DOWN) {
+        ZF_LOGI("PLL for clock '%s' powered down", clk->name);
         return 0;
     }
 
@@ -909,7 +967,7 @@ static freq_t _usb_set_freq(clk_t *clk, freq_t hz UNUSED)
             (unsigned int)(hz / MHZ),
             (unsigned int)(hz % MHZ));
 
-    ZF_LOGE("PLL_USB changing is not supported");
+    ZF_LOGE("PLL_USB changing is not implemented");
     assert(0);
 
     return f_pre;
@@ -923,6 +981,7 @@ static void _usb_recal(clk_t *clk UNUSED)
 
 static clk_t *_usb_init(clk_t *clk)
 {
+    ZF_LOGI("enter");
     if (clk->parent == NULL) {
         clk_t *parent = clk_get_clock(clk_get_clock_sys(clk), CLK_MASTER);
         clk_register_child(parent, clk);
@@ -1035,6 +1094,7 @@ static void _clko_recal(clk_t *clk UNUSED)
 
 static clk_t *_clko_init(clk_t *clk)
 {
+    ZF_LOGI("enter");
     assert(clk_get_clock_sys(clk));
     if (clk->parent == NULL) {
         /* We currently only support 1 src, but there are many to choose from */
@@ -1120,6 +1180,7 @@ static int imx6_gate_enable(
 
 int clock_sys_init(ps_io_ops_t *o, clock_sys_t *clock_sys)
 {
+    ZF_LOGI("enter");
     MAP_IF_NULL(o, CCM, clk_regs.ccm);
     MAP_IF_NULL(o, CCM_ANALOG, clk_regs.alg);
     clock_sys->priv = (void *)&clk_regs;

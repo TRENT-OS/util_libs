@@ -274,6 +274,9 @@ static int setup_desc_ring(imx6_eth_driver_t *dev, ring_ctx_t *ring)
 
     size_t size = sizeof(struct descriptor) * ring->cnt;
 
+    ZF_LOGI("DMA alloc rx descr: %zu x %zu byte",
+              ring->cnt, sizeof(struct descriptor));
+
     /* allocate uncached memory, function will also clean an invalidate cache
      * to for the area internally to save us from surprises
      */
@@ -330,6 +333,8 @@ static int setup_desc_ring(imx6_eth_driver_t *dev, ring_ctx_t *ring)
 
 static void complete_rx(imx6_eth_driver_t *dev)
 {
+    // ZF_LOGI("enter");
+
     assert(dev);
 
     void *cb_cookie = dev->eth_drv.cb_cookie;
@@ -350,12 +355,15 @@ static void complete_rx(imx6_eth_driver_t *dev)
 
         /* If the slot is still marked as empty we are done. */
         if (d->stat & RXD_EMPTY) {
+            // ZF_LOGI("complete_rx: empty head %u, tail %u", head, ring->tail);
             assert(dev->enet);
             if (!enet_rx_enabled(dev->enet)) {
                 enet_rx_enable(dev->enet);
             }
             break;
         }
+
+        // ZF_LOGI("complete_rx: release ring head %u, tail %u", head, ring->tail);
 
         void *cookie = ring->cookies[head];
         /* Go to next buffer, handle roll-over. */
@@ -389,6 +397,8 @@ static void complete_tx(imx6_eth_driver_t *dev)
 
     while (head != ring->tail) {
 
+        // ZF_LOGI("tx ring: head %u, tail %u", head, ring->tail);
+
         if (0 == cnt) {
             cnt = dev->tx_lengths[head];
             if ((0 == cnt) || (cnt > dev->tx.cnt)) {
@@ -408,12 +418,16 @@ static void complete_tx(imx6_eth_driver_t *dev)
 
         /* If this buffer was not sent, we can't release any buffer. */
         if (d->stat & TXD_READY) {
+            // ZF_LOGI("complete_tx: not read head %u", head);
             assert(dev->enet);
             if (!enet_tx_enabled(dev->enet)) {
+                ZF_LOGI("complete_tx, re-enable TX");
                 enet_tx_enable(dev->enet);
             }
             return;
         }
+
+        //  ZF_LOGI("complete_tx: release ring head %u, tail %u", head, ring->tail);
 
         /* Go to next buffer, handle roll-over. */
         if (++head == dev->tx.cnt) {
@@ -421,6 +435,9 @@ static void complete_tx(imx6_eth_driver_t *dev)
         }
 
         if (0 == --cnt) {
+
+            // ZF_LOGI("complete_tx: release %u", cnt_org);
+
             ring->head = head;
             /* race condition if add/remove is not synchronized. */
             ring->remain += cnt_org;
@@ -461,10 +478,14 @@ static void handle_irq(struct eth_driver *driver, int irq)
     assert(enet);
 
     uint32_t e = enet_clr_events(enet, IRQ_MASK);
+    // ZF_LOGI("handle_irq(), irq=%d, e=0x%x", irq, e);
+
     if (e & NETIRQ_TXF) {
+        // ZF_LOGI("handle_irq(), NETIRQ_TXF");
         complete_tx(dev);
     }
     if (e & NETIRQ_RXF) {
+        // ZF_LOGI("handle_irq(), NETIRQ_RXF");
         complete_rx(dev);
         fill_rx_bufs(dev);
     }
@@ -499,6 +520,8 @@ static void eth_irq_handle(void *ctx, ps_irq_acknowledge_fn_t acknowledge_fn,
 
 static void raw_poll(struct eth_driver *driver)
 {
+    // ZF_LOGI("enter");
+
     assert(driver);
 
     imx6_eth_driver_t *dev = imx6_eth_driver(driver);
@@ -525,6 +548,8 @@ static int raw_tx(struct eth_driver *driver, unsigned int num, uintptr_t *phys,
     assert(dev);
 
     ring_ctx_t *ring = &(dev->tx);
+
+    // ZF_LOGI("num = %u, ring->remain = %u", num, ring->remain);
 
     /* Ensure we have room */
     if (ring->remain < num) {
@@ -554,6 +579,8 @@ static int raw_tx(struct eth_driver *driver, unsigned int num, uintptr_t *phys,
             tail_new = 0;
             stat |= TXD_WRAP;
         }
+
+        // ZF_LOGI("phys %p, len %u", *phys, *len);
         update_ring_slot(ring, idx, *phys++, *len++, stat);
     }
 
@@ -798,6 +825,10 @@ static int allocate_register_callback(pmem_region_t pmem, unsigned curr_num,
     assert(token);
     imx6_eth_driver_t *dev = (imx6_eth_driver_t *)token;
 
+    ZF_LOGI(
+        "curr_num %d, num_regs %zu, pmem type %d, addr 0x%"PRIx64", len 0x%"PRIx64,
+        curr_num, num_regs, pmem.type, pmem.base_addr, pmem.length);
+
     /* we support only one peripheral, ignore others gracefully */
     if (curr_num != 0) {
         ZF_LOGW("Ignoring peripheral register bank #%d at 0x%"PRIx64,
@@ -815,6 +846,9 @@ static int allocate_register_callback(pmem_region_t pmem, unsigned curr_num,
         return -EIO;
     }
 
+    ZF_LOGI("allocate_register_callback() device mapped at %p",
+             dev->mapped_peripheral);
+
     return 0;
 }
 
@@ -823,6 +857,8 @@ static int allocate_irq_callback(ps_irq_t irq, unsigned curr_num,
 {
     assert(token);
     imx6_eth_driver_t *dev = (imx6_eth_driver_t *)token;
+
+    ZF_LOGI("curr_num %d, num_irqs %zu, irq %d", curr_num, num_irqs, irq);
 
     unsigned target_num = config_set(CONFIG_PLAT_IMX8MQ_EVK) ? 2 : 0;
     if (curr_num != target_num) {
@@ -840,6 +876,8 @@ static int allocate_irq_callback(ps_irq_t irq, unsigned curr_num,
         return -EIO;
     }
 
+    ZF_LOGI("IRQ mapped to id %d", dev->irq_id);
+
     return 0;
 }
 
@@ -847,6 +885,11 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
 {
     int ret;
     imx6_eth_driver_t *driver = NULL;
+
+    // let all other tasks start, so they don't mess with our log
+    ZF_LOGI("'%s' waits some time for cleaner debug log", device_path);
+    extern void sched_yield(void);
+    for (unsigned int delay=0; delay<100; delay++) { sched_yield(); }
 
     /* get a configuration if function is implemented */
     const nic_config_t *nic_config = NULL;
@@ -951,6 +994,8 @@ int ethif_imx_init_module(ps_io_ops_t *io_ops, const char *device_path)
         ret = -ENODEV;
         goto error;
     }
+
+    ZF_LOGI("ethernet module init successful");
 
     return 0;
 

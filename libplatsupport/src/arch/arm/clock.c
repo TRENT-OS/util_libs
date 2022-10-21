@@ -33,12 +33,14 @@ clk_t *_fixed_clk_init(clk_t *clk)
 /* Default clocks. Simply report the recorded default frequency */
 freq_t _default_clk_get_freq(clk_t *clk)
 {
+    // LOG_INFO("enter, ps_freq_default[%d]=%d", clk->id, ps_freq_default[clk->id]);
     assert(clk->id < NCLOCKS);
     return ps_freq_default[clk->id];
 }
 
 freq_t _default_clk_set_freq(clk_t *clk, freq_t hz UNUSED)
 {
+    // LOG_INFO("calling clk_get_freq()");
     return clk_get_freq(clk);
 }
 
@@ -49,11 +51,13 @@ void _default_clk_recal(clk_t *clk UNUSED)
 
 clk_t *_default_clk_init(clk_t *clk)
 {
+    // LOG_INFO("enter");
     return clk;
 }
 
 static clk_t *get_clock_default(clock_sys_t *clock_sys UNUSED, enum clk_id id)
 {
+    // LOG_INFO("enter");
     if (id >= NCLOCKS) {
         return NULL;
     } else {
@@ -73,11 +77,13 @@ static int gate_enable_default(clock_sys_t *clock_sys UNUSED, enum clock_gate ga
                                enum clock_gate_mode mode UNUSED)
 {
     /* Assume the gate is already enabled */
+    // LOG_INFO("enter");
     return 0;
 }
 
 int clock_sys_init_default(clock_sys_t *clock_sys)
 {
+    // LOG_INFO("enter");
     clock_sys->get_clock = &get_clock_default;
     clock_sys->gate_enable = &gate_enable_default;
     /* Clock subsystem is invalid if there is not private data attached */
@@ -87,6 +93,7 @@ int clock_sys_init_default(clock_sys_t *clock_sys)
 
 int clock_sys_set_default_freq(enum clk_id id, freq_t hz)
 {
+    // LOG_INFO("enter");
     if (id >= NCLOCKS) {
         return -1;
     } else {
@@ -97,6 +104,7 @@ int clock_sys_set_default_freq(enum clk_id id, freq_t hz)
 
 clk_t *ps_get_clock(clock_sys_t *sys, enum clk_id id)
 {
+    // LOG_INFO("enter");
     if (id >= NCLOCKS) {
         return NULL;
     } else {

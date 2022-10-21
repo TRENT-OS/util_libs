@@ -370,6 +370,7 @@ static int genphy_parse_link(struct phy_device *phydev)
 
 int genphy_config(struct phy_device *phydev)
 {
+    ZF_LOGI("enter");
     int val;
     u32 features;
 
@@ -428,6 +429,7 @@ int genphy_config(struct phy_device *phydev)
 
 int genphy_startup(struct phy_device *phydev)
 {
+    ZF_LOGI("enter");
     genphy_update_link(phydev);
     genphy_parse_link(phydev);
 
@@ -507,6 +509,8 @@ static struct phy_device *phy_device_create(struct mii_dev *bus, int addr,
                                             int phy_id,
                                             phy_interface_t interface)
 {
+    ZF_LOGI("phy_device_create(), addr %u, phy_id 0x%x", addr, phy_id);
+
     struct phy_device *dev;
 
     /* We allocate the device, and initialize the
@@ -603,6 +607,7 @@ static struct phy_device *search_for_existing_phy(struct mii_dev *bus,
     while (phy_mask) {
         int addr = ffs(phy_mask) - 1;
         if (bus->phymap[addr]) {
+            ZF_LOGI("using existing phy device at addr %d", addr);
             bus->phymap[addr]->interface = interface;
             return bus->phymap[addr];
         }
@@ -616,6 +621,7 @@ static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
 {
     struct phy_device *phydev = search_for_existing_phy(bus, phy_mask, interface);
     if (phydev) {
+        ZF_LOGI("found existing phy device %p for mask 0x%x", phydev, phy_mask);
         return phydev;
     }
     /* Try Standard (ie Clause 22) access */
@@ -623,10 +629,11 @@ static struct phy_device *get_phy_device_by_mask(struct mii_dev *bus,
     for (unsigned int i = 0; i < 5; i++) {
         phydev = create_phy_by_mask(bus, phy_mask, i ? i : MDIO_DEVAD_NONE, interface);
         if (phydev) {
+            ZF_LOGI("created new phy device %p for mask 0x%x (i=%d)", phydev, phy_mask, i);
             return phydev;
         }
     }
-    ZF_LOGE("PHY not found");
+    ZF_LOGE("phy device not found for mask 0x%x, fall back to defaults", phy_mask);
     return phy_device_create(bus, ffs(phy_mask) - 1, 0xffffffff, interface);
 }
 
@@ -702,6 +709,7 @@ int phy_reset(struct phy_device *phydev)
 
 int miiphy_reset(const char *devname, unsigned char addr)
 {
+    ZF_LOGI("enter");
     struct mii_dev *bus = miiphy_get_dev_by_name(devname);
     struct phy_device *phydev;
 
@@ -740,7 +748,7 @@ struct phy_device *phy_connect_by_mask(struct mii_dev *bus, unsigned phy_mask,
     phy_reset(phydev);
 
     if (phydev->dev) {
-        ZF_LOGI("%s:%d is connected to %s.  Reconnecting to %s",
+        ZF_LOGI("reconnecting PHY '%s' at address %d from '%s' to '%s'",
                 bus->name, phydev->addr, phydev->dev->name, dev->name);
     }
     phydev->dev = dev;

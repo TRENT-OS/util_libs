@@ -208,6 +208,15 @@ uint64_t ocotp_get_mac(struct ocotp *ocotp, unsigned int id)
      *     ENET2: 0x0000<gg><hh><ii><jj><kk><ll>
      */
 
+#if defined(CONFIG_PLAT_IMX6DQ)
+    // ZF_LOGI("OCOTP mac[2]: 0x%08x 0x%08x", regs->mac0, regs->mac1);
+#elif defined(CONFIG_PLAT_IMX6SX)
+    // ZF_LOGI("OCOTP mac[3]: 0x%08x, 0x%08x, 0x%08x",
+    //         regs->mac0, regs->mac1, regs->mac2);
+#else
+#error "unsupported i.MX6 SoC"
+#endif
+
     uint64_t mac = 0;
 
     switch (id) {

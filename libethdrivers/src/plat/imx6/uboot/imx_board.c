@@ -72,31 +72,51 @@ static void imx_iomux_v3_setup_multiple_pads(
     iomux_v3_cfg_t const *pad_list,
     unsigned int count)
 {
+    ZF_LOGI("IOMUX setup (%d elements)", count);
     for (unsigned int i = 0; i < count; i++) {
+        // printf("  %3d: ", i+1);
         iomux_v3_cfg_t pad = pad_list[i];
 
         // set mode
         uint32_t mux_ctrl_ofs = (pad & MUX_CTRL_OFS_MASK) >> MUX_CTRL_OFS_SHIFT;
         if (mux_ctrl_ofs) {
             uint32_t mux_mode = (pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT;
+            // printf("[0x%03x] = mode %d", mux_ctrl_ofs, mux_mode);
             __raw_writel(mux_mode, base + mux_ctrl_ofs);
         }
+        else {
+            // printf("no mode");
+        }
+        // printf(", ");
 
         // set input selector
         uint32_t sel_input_ofs = (pad & MUX_SEL_INPUT_OFS_MASK) >> MUX_SEL_INPUT_OFS_SHIFT;
         if (sel_input_ofs) {
             uint32_t sel_input = (pad & MUX_SEL_INPUT_MASK) >> MUX_SEL_INPUT_SHIFT;
+            // printf("[0x%03x] = sel_input 0x%x", sel_input_ofs, sel_input);
             __raw_writel(sel_input, base + sel_input_ofs);
         }
+        else {
+            // printf("no sel_input");
+        }
+        // printf(", ");
 
         // set pad control
         uint32_t pad_ctrl_ofs = (pad & MUX_PAD_CTRL_OFS_MASK) >> MUX_PAD_CTRL_OFS_SHIFT;
         if (pad_ctrl_ofs) {
             uint32_t pad_ctrl = (pad & MUX_PAD_CTRL_MASK) >> MUX_PAD_CTRL_SHIFT;
             if (!(pad_ctrl & NO_PAD_CTRL)) {
+                // printf("[0x%03x] = pad_ctrl 0x%x", pad_ctrl_ofs, pad_ctrl);
                 __raw_writel(pad_ctrl, base + pad_ctrl_ofs);
             }
+            else {
+                // printf("pad_ctrl off");
+            }
         }
+        else {
+            // printf("no pad_ctrl");
+        }
+        // printf("\n");
     }
 }
 
@@ -113,6 +133,8 @@ static void imx_iomux_v3_setup_multiple_pads(
 
 int setup_iomux_enet(ps_io_ops_t *io_ops)
 {
+    // ZF_LOGI("enter");
+
     int ret;
     void *base;
     int unmapOnExit = 0;

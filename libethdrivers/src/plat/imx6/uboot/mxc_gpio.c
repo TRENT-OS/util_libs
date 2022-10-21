@@ -186,11 +186,14 @@ int gpio_free(unsigned gpio)
 
 int gpio_direction_input(unsigned gpio, ps_io_ops_t *io_ops)
 {
+    // ZF_LOGI("GPIO: set pin %u (%u:%u) to input", gpio, 1+(gpio/32), gpio%32);
     return mxc_gpio_direction(gpio, MXC_GPIO_DIRECTION_IN, io_ops);
 }
 
 int gpio_direction_output(unsigned gpio, int value, ps_io_ops_t *io_ops)
 {
+    // ZF_LOGI("GPIO: set pin %u (%u:%u) to %d", gpio, 1+(gpio/32), gpio%32, value);
+
     int ret = mxc_gpio_direction(gpio, MXC_GPIO_DIRECTION_OUT, io_ops);
 
     if (ret < 0) {

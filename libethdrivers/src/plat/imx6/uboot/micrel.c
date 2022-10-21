@@ -69,6 +69,8 @@ int ksz9021_phy_extended_read(struct phy_device *phydev, int regnum)
 /* Micrel ksz9021 */
 int ksz9021_config(struct phy_device *phydev)
 {
+    ZF_LOGI("enter");
+
     unsigned ctrl1000 = 0;
     const unsigned master = CTRL1000_PREFER_MASTER |
                             CTRL1000_CONFIG_MASTER | CTRL1000_MANUAL_CONFIG;
@@ -114,21 +116,29 @@ void print_phyregs(struct phy_device *phydev)
 
 int ksz9021_startup(struct phy_device *phydev)
 {
+    ZF_LOGI("enter");
     unsigned phy_ctl;
     genphy_update_link(phydev);
     phy_ctl = phy_read(phydev, MDIO_DEVAD_NONE, MII_KSZ9021_PHY_CTL);
 
     if (phy_ctl & MIIM_KSZ9021_PHYCTL_DUPLEX) {
+        ZF_LOGI("DUPLEX_FULL");
         phydev->duplex = DUPLEX_FULL;
     } else {
+        ZF_LOGI("DUPLEX_HALF");
         phydev->duplex = DUPLEX_HALF;
     }
     if (phy_ctl & MIIM_KSZ9021_PHYCTL_1000) {
+        ZF_LOGI("SPEED_1000");
         phydev->speed = SPEED_1000;
     } else if (phy_ctl & MIIM_KSZ9021_PHYCTL_100) {
+        ZF_LOGI("SPEED_100");
         phydev->speed = SPEED_100;
     } else if (phy_ctl & MIIM_KSZ9021_PHYCTL_10) {
+        ZF_LOGI("SPEED_10");
         phydev->speed = SPEED_10;
+    } else {
+        ZF_LOGI("SPEED? 0x%x", phy_ctl);
     }
     return 0;
 }
@@ -145,6 +155,7 @@ static struct phy_driver ksz9021_driver = {
 
 int phy_micrel_init(void)
 {
+    ZF_LOGI("enter");
     phy_register(&KSZ804_driver);
     phy_register(&ksz9021_driver);
     return 0;

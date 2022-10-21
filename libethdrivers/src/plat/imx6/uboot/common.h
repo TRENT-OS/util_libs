@@ -28,6 +28,7 @@
 
 #include <autoconf.h>
 #include <utils/gen_config.h>
+#include <utils/util.h> // for ZF_LOGx()
 #include <utils/arith.h>
 #include "../unimplemented.h"
 

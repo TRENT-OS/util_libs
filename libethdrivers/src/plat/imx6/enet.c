@@ -361,7 +361,7 @@ void enet_set_speed(struct enet *enet, int speed, int full_duplex)
         rcr |= RCR_RMII_10T;
         break;
     default:
-        ZF_LOGE("Invalid speed");
+        ZF_LOGE("Invalid speed %d", speed);
         assert(0);
         return;
     }
@@ -382,6 +382,7 @@ void enet_set_speed(struct enet *enet, int speed, int full_duplex)
 
 int enet_mdio_read(struct enet *enet, uint16_t phy, uint16_t reg)
 {
+    // ZF_LOGI("enter");
     enet_regs_t *regs = enet_get_regs(enet);
     uint32_t v;
     assert(!(phy & ~0x1f));
@@ -400,6 +401,7 @@ int enet_mdio_read(struct enet *enet, uint16_t phy, uint16_t reg)
 int enet_mdio_write(struct enet *enet, uint16_t phy, uint16_t reg,
                     uint16_t data)
 {
+    // ZF_LOGI("enter");
     enet_regs_t *regs = enet_get_regs(enet);
     uint32_t v;
     assert(!(phy & ~0x1f));
@@ -482,7 +484,14 @@ uint64_t enet_get_mac(struct enet *enet)
      *   PAUR = 0x<ee><ff><xxxx>
      * We return it as uint64_t 0x0000<aa><bb><cc><dd><ee><ff>
      */
-    return (((uint64_t)regs->palr) << 16) | (regs->paur >> 16);
+
+    uint64_t mac = (((uint64_t)regs->palr) << 16) | (regs->paur >> 16);
+
+    ZF_LOGI("get MAC: %02x:%02x:%02x:%02x:%02x:%02x",
+            (uint8_t)(mac >> 40), (uint8_t)(mac >> 32), (uint8_t)(mac >> 24),
+            (uint8_t)(mac >> 16), (uint8_t)(mac >> 8), (uint8_t)mac);
+
+    return mac;
 }
 
 void enet_enable_events(struct enet *enet, uint32_t mask)
@@ -533,6 +542,8 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
                        uintptr_t rx_phys, size_t rx_bufsize, uint64_t mac,
                        ps_io_ops_t *io_ops)
 {
+    // ZF_LOGI("enter, enet_mapping %p", enet_mapping);
+
     assert(mapped_peripheral);
 
     struct clock *enet_clk_ptr = NULL;
@@ -551,6 +562,8 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
     regs->eir  = 0xffffffff;
 
 #if defined(CONFIG_PLAT_IMX6)
+
+    // ZF_LOGI("IMX6 setup ENET clocks");
 
     /* Set the ethernet clock frequency */
     clock_sys_t *clk_sys = malloc(sizeof(clock_sys_t));
@@ -595,6 +608,7 @@ struct enet *enet_init(void *mapped_peripheral, uintptr_t tx_phys,
     /* Set the MDIO clock frequency */
     mdc_clk.priv = (void *)regs;
     clk_register_child(enet_clk_ptr, &mdc_clk);
+    // ZF_LOGI("calling clk_set_freq(&mdc_clk, MDC_FREQ) ...");
     clk_set_freq(&mdc_clk, MDC_FREQ);
 
     /* Clear out MIB */

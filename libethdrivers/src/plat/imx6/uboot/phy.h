@@ -174,7 +174,8 @@ struct phy_device {
 
 static inline int phy_read(struct phy_device *phydev, int devad, int regnum)
 {
-    struct mii_dev *bus = phydev->bus;
+	// ZF_LOGI("Called phy_read() in phy.h with phydev->addr = %d", phydev->addr);
+	struct mii_dev *bus = phydev->bus;
 
     return bus->read(bus, phydev->addr, devad, regnum);
 }
@@ -182,7 +183,8 @@ static inline int phy_read(struct phy_device *phydev, int devad, int regnum)
 static inline int phy_write(struct phy_device *phydev, int devad, int regnum,
                             uint16_t val)
 {
-    struct mii_dev *bus = phydev->bus;
+	// ZF_LOGI("Called phy_write() in phy.h with phydev->addr = %d", phydev->addr);
+	struct mii_dev *bus = phydev->bus;
 
     return bus->write(bus, phydev->addr, devad, regnum, val);
 }

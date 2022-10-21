@@ -42,6 +42,7 @@
 static int fec_phy_read(struct mii_dev *bus, int phyAddr, UNUSED int dev_addr,
                         int regAddr)
 {
+    // ZF_LOGI("addr=%d, reg=0x%x", phyAddr, regAddr);
     struct enet *enet = (struct enet *)bus->priv;
     assert(enet);
     return enet_mdio_read(enet, phyAddr, regAddr);
@@ -50,6 +51,7 @@ static int fec_phy_read(struct mii_dev *bus, int phyAddr, UNUSED int dev_addr,
 static int fec_phy_write(struct mii_dev *bus, int phyAddr, UNUSED int dev_addr,
                          int regAddr, uint16_t data)
 {
+    // ZF_LOGI("addr=%d, reg=%d, data=0x%x", phyAddr, regAddr, data);
     struct enet *enet = (struct enet *)bus->priv;
     assert(enet);
     return enet_mdio_write(enet, phyAddr, regAddr, data);
@@ -107,6 +109,23 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
 {
     int ret;
 
+    // ZF_LOGI("phy_mask: 0x%08x, enet: %p", phy_mask, enet);
+    // if (enet)
+    // {
+    //     unsigned int phy_cnt = 0;
+    //     for (unsigned int addr = 0; addr < 16; addr++)
+    //     {
+    //         uint32_t id1 = enet_mdio_read(enet, addr, MII_PHYSID1);
+    //         uint32_t id2 = enet_mdio_read(enet, addr, MII_PHYSID2);
+    //         if ((0 != (id1 | id2)) && (0xffff != (id1 & id2)))
+    //         {
+    //             phy_cnt++;
+    //             ZF_LOGI("PHY: address %d, ID 0x%x, 0x%x", addr, id1, id2);
+    //         }
+    //     }
+    //     ZF_LOGI("found %d PHY(s)", phy_cnt);
+    // }
+
     /* Allocate the mdio bus */
     struct mii_dev *bus = mdio_alloc();
     if (!bus) {
@@ -153,7 +172,11 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
         return NULL;
     }
 
+    ZF_LOGI("do board specific PHY setup");
+
 #if defined(CONFIG_PLAT_IMX8MQ_EVK)
+
+    ZF_LOGI("IMX8MQ_EVK: Initializing PHY");
 
     /* enable rgmii rxc skew and phy mode select to RGMII copper */
     phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x1f);
@@ -164,6 +187,7 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
 #elif defined(CONFIG_PLAT_SABRE)
 
     if (0x00221610 == (phydev->phy_id & 0xfffffff0)) { /* ignore silicon rev */
+        ZF_LOGI("SABRE: Initializing PHY for ksz9021");
         /* min rx data delay */
         ksz9021_phy_extended_write(phydev, MII_KSZ9021_EXT_RGMII_RX_DATA_SKEW, 0x0);
         /* min tx data delay */
@@ -171,6 +195,7 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
         /* max rx/tx clock delay, min rx/tx control */
         ksz9021_phy_extended_write(phydev, MII_KSZ9021_EXT_RGMII_CLOCK_SKEW, 0xf0f0);
     } else if (0x0007c0d1 == phydev->phy_id) {
+        ZF_LOGI("SABRE: no need to initialize PHY emulated by QEMU");
         /* seems we are running on QEMU, no special init for the emulated PHY */
     } else {
         ZF_LOGW("SABRE: unexpected PHY with ID 0x%x", phydev->phy_id);
@@ -179,6 +204,7 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
 #elif defined(CONFIG_PLAT_NITROGEN6SX)
 
     if (0x004dd072 == phydev->phy_id) {
+        ZF_LOGI("NITROGEN6SX: Initializing PHY for ar803x");
         /* Disable Ar803x PHY SmartEEE feature, it causes link status glitches
          * that result in the ethernet link going down and up.
          */
@@ -196,6 +222,7 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
 #endif
 
     if (phydev->drv->config) {
+        ZF_LOGI("calling phydev->drv->config()");
         ret = phydev->drv->config(phydev);
         if (ret) {
             ZF_LOGE("Could not configure PHY '%s', code %d",
@@ -203,14 +230,21 @@ struct phy_device *fec_init(unsigned int phy_mask, struct enet *enet,
             return NULL;
         }
     }
+    else {
+        ZF_LOGI("skip unused phydev->drv->config()");
+    }
 
     if (phydev->drv->startup) {
+        ZF_LOGI("calling phydev->drv->startup()");
         ret = phydev->drv->startup(phydev);
         if (ret) {
             ZF_LOGE("Could not init PHY '%s', code %d",
                     phydev->dev->name, ret);
             return NULL;
         }
+    }
+    else {
+        ZF_LOGI("skip unused phydev->drv->startup()");
     }
 
     return phydev;

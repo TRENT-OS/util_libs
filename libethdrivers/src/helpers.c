@@ -26,6 +26,9 @@ dma_addr_t dma_alloc_pin(ps_dma_man_t *dma_man, size_t size, int cached, int ali
             .virt = NULL, .phys = 0
         };
     }
+
+    // LOG_INFO("DMA memory at %p, size=%zu, phys %p", virt, size, (void*)phys);
+
     if (!cached) {
         /* Prevent any cache bombs */
         ps_dma_cache_clean_invalidate(dma_man, virt, size);
