@@ -11,9 +11,13 @@
 
 #include "../../chardev.h"
 
+#include <platsupport/delay.h>
+
 #define UART_BYTE_MASK  0xff
 
 #define NV_UART_INPUT_CLOCK_FREQ_HZ (408000000)
+#define NV_AON_UART_INPUT_CLOCK_FREQ_HZ (38400000)
+#define NV_XAVIER_UART_A_INPUT_CLOCK_FREQ_HZ (19200000) // CLK_M
 
 #define LCR_DLAB        BIT(7)
 #define LCR_SET_BREAK   BIT(6)
@@ -31,6 +35,7 @@
 
 #define IER_RHR_ENABLE          BIT(0)
 #define IER_THR_EMPTY_ENABLE    BIT(1)
+#define IER_RXS_ENABLE          BIT(2)
 #define IER_RX_FIFO_TIMEDOUT    BIT(4)
 #define IER_EO_RECEIVE_DATA     BIT(5)
 
@@ -88,8 +93,10 @@ struct tk1_uart_regs {
     uint32_t    msr;        /* 0x18: modem status                           */
     uint32_t    spr;        /* 0x1c: scratchpad                             */
     uint32_t    csr;        /* 0x20: IrDA pulse coding                      */
-    uint32_t    rx_fifo_cfg;/* 0x24:                                        */
+    uint32_t    rx_fifo_cfg;/* 0x24: RX FIFO configuration                  */
     uint32_t    mie;        /* 0x28: modem interrupt enable                 */
+    uint32_t    vs;         /* 0x2c: vendor status                          */
+    uint32_t    res[3];     /*                                              */
     uint32_t    asr;        /* 0x3c: auto sense baud                        */
 };
 typedef volatile struct tk1_uart_regs tk1_uart_regs_t;
@@ -127,14 +134,15 @@ static inline void
 tk1_uart_set_rbr_irq(tk1_uart_regs_t *regs, bool enable)
 {
     uint32_t ier;
-
     ier = regs->ier_dlab;
     if (enable) {
         ier |= IER_RHR_ENABLE;
         ier |= IER_RX_FIFO_TIMEDOUT;
+        ier |= IER_RXS_ENABLE;
     } else {
         ier &= ~IER_RHR_ENABLE;
         ier &= ~IER_RX_FIFO_TIMEDOUT;
+        ier &= ~IER_RXS_ENABLE;
     }
     regs->ier_dlab = ier;
 }
@@ -267,6 +275,10 @@ uart_handle_irq(ps_chardevice_t* d)
             regs->ier_dlab |= IER_EO_RECEIVE_DATA;
         }
 
+        if(tk1_uart_is_async(d) && d->read_descriptor.callback == NULL) {
+            break;
+        }
+
         if (rd->data == NULL || rd->bytes_requested == 0) {
             /* Even if there is no rx buffer, or no bytes have been requested,
              * or some other unusual case has been triggered, we should read the
@@ -379,44 +391,37 @@ tk1_uart_write(ps_chardevice_t* d, const void* vdata,
                            size_t count, chardev_callback_t rcb,
                            void* token)
 {
-    struct chardev_xmit_descriptor wd = {
-        .callback = rcb,
-        .token = token,
-        .bytes_transfered = 0,
-        .bytes_requested = count,
-        .data = (void *)vdata
-    };
+    if (tk1_uart_is_async(d)) {
+        /* Interrupt and callback is not used of there is no data */
+        if (count > 0) {
 
-    d->write_descriptor = wd;
+            THREAD_MEMORY_ACQUIRE();
+            if (d->write_descriptor.bytes_transfered < d->write_descriptor.bytes_requested) {
+                ZF_LOGE("older async write request still pending.");
+                return -1; /* older request still pending */
+            }
 
-    if (count == 0) {
-        /* Call the callback immediately */
-        if (rcb != NULL) {
-            rcb(d, CHARDEV_STAT_COMPLETE, count, token);
+            d->write_descriptor = (struct chardev_xmit_descriptor) {
+                .callback = rcb,
+                .token = token,
+                .bytes_transfered = 0,
+                .bytes_requested = count,
+                .data = (void *)vdata
+            };
+            tk1_uart_set_thr_irq(tk1_uart_get_priv(d), true);
+            THREAD_MEMORY_RELEASE();
         }
         return 0;
     }
 
-    if (!tk1_uart_is_async(d)) {
-        /* Write the data out over the line synchronously. */
-        for (int i = 0; i < count; i++) {
-            while (uart_putchar(d, ((uint8_t *)vdata)[i]) == -1) {
-            }
-
-            d->write_descriptor.bytes_transfered++;
+    /* Write the data out over the line synchronously. */
+    for (int i = 0; i < count; i++) {
+        while (uart_putchar(d, ((uint8_t *)vdata)[i]) == -1) {
+            /* blocking wait */
         }
-
-        if (rcb != NULL) {
-            rcb(d, CHARDEV_STAT_COMPLETE, d->write_descriptor.bytes_transfered,
-                token);
-        }
-    } else {
-        /* Else enable the THRE IRQ and return. */
-        tk1_uart_set_thr_irq(tk1_uart_get_priv(d), true);
-        THREAD_MEMORY_RELEASE();
     }
 
-    return d->write_descriptor.bytes_transfered;
+    return count;
 }
 
 static ssize_t
@@ -443,20 +448,28 @@ tk1_uart_read(ps_chardevice_t* d, void* vdata,
         rcb(d, CHARDEV_STAT_COMPLETE, count, token);
     }
 
-    if (!tk1_uart_is_async(d)) {
+    if(!tk1_uart_is_async(d) || d->read_descriptor.callback == NULL) {
         int n_chars_read = 0;
         int c;
 
-        while ((c = uart_getchar(d)) == -1) {
-            /* Ideally we should use a cpu_relax() type of opcode here. */
+        /* Don't block in async mode */
+        if(tk1_uart_is_async(d)) {
+            c = uart_getchar(d);
+        }
+        else {
+            while ((c = uart_getchar(d)) == -1) {
+                /* Ideally we should use a cpu_relax() type of opcode here. */
+            }
         }
 
         /* Read the data synchronously. */
         while (c != -1) {
-            ((uint8_t *)vdata)[n_chars_read] = c;
+            ((uint8_t *)vdata)[n_chars_read++] = c;
 
+            if(n_chars_read == count) {
+                break;
+            }
             c = uart_getchar(d);
-            n_chars_read++;
         }
 
         d->read_descriptor.bytes_transfered = n_chars_read;
@@ -526,7 +539,7 @@ tk1_uart_get_divisor_for(int baud)
         return -1;
     }
 
-    /* Both we an u-boot program the UARTs to use PllP_out as their input clock,
+    /* Both we and u-boot program the UARTs to use PllP_out as their input clock,
      * which is fixed at 408MHz:
      *
      *  TegraK1 TRM, Section 5.22, Table 14:
@@ -545,8 +558,27 @@ tk1_uart_get_divisor_for(int baud)
      * The number "16" comes from the fact that the UART controller takes 16
      * clock phases to generate one bit of output on the line (TK1 TRM, section
      * 34.1.1.)
+     *
+     * The same approach applies to the Tegra X1.
+     *
+     * Since the Tegra X2, the only UART freely available on the 40-pin header is
+     * assigned to another cluster than CCPLEX, which is called AON. By default, this
+     * UART's (here: UARTC) frequency is set to 38.4MHz.
      */
-    ret = (NV_UART_INPUT_CLOCK_FREQ_HZ / 16) / baud;
+
+    int freq;
+    if(config_set(CONFIG_PLAT_TX2)) {
+        freq = NV_AON_UART_INPUT_CLOCK_FREQ_HZ;
+    }
+    else if(config_set(CONFIG_PLAT_XAVIER)) {
+        freq = NV_XAVIER_UART_A_INPUT_CLOCK_FREQ_HZ;
+    }
+    else {
+        freq = NV_UART_INPUT_CLOCK_FREQ_HZ;
+    }
+
+    ret = (freq / 16) / baud;
+
     return ret;
 }
 
@@ -602,10 +634,17 @@ serial_configure(ps_chardevice_t* d, long bps, int char_size, enum serial_parity
             return -1;
     }
 
+/*
+ * Uncomment if we run into a problem: the TRM recommends setting 2 transmit stop bits
+ *
+    lcr |= BIT(2);
+*/
+
     /* one stop bit */
     regs->lcr = lcr;
 
     divisor = tk1_uart_get_divisor_for(bps);
+
     if (divisor < 1) {
         /* Unsupported baud rate. */
         return -1;
@@ -637,6 +676,8 @@ serial_configure(ps_chardevice_t* d, long bps, int char_size, enum serial_parity
         /* Re-enable receive IRQ. */
         tk1_uart_set_rbr_irq(regs, true);
     }
+
+    uint32_t iir_fcr = regs->iir_fcr;
 
     return 0;
 }
@@ -700,6 +741,8 @@ tk1_uart_init_common(const struct dev_defn *defn, void *const uart_mmio_vaddr,
     tk1_uart_set_rbr_irq(regs, false);
     tk1_uart_set_thr_irq(regs, false);
 
+    uint16_t divisor = tk1_uart_get_dlab_divisor(dev);
+
     /* Line configuration */
     serial_configure(dev, 115200, 8, PARITY_NONE, 1);
 
@@ -710,7 +753,7 @@ tk1_uart_init_common(const struct dev_defn *defn, void *const uart_mmio_vaddr,
      * actually returns the values from the IIR, so you can't actually read FCR.
      */
     iir_fcr = 0
-        | FCR_FIFO_ENABLE | FCR_DMA_MODE0
+        | FCR_FIFO_ENABLE | FCR_DMA_MODE1
         | ENCODE_BITS(0, FCR_RX_TRIG_SHIFT, FCR_RX_TRIG_MASK, FCR_RX_TRIG_FIFO_GT_16)
         | ENCODE_BITS(0, FCR_TX_TRIG_SHIFT, FCR_TX_TRIG_MASK, FCR_TX_TRIG_FIFO_GT_16)
         | BIT(FCR_TX_FIFO_CLEAR_SHIFT)
@@ -718,8 +761,12 @@ tk1_uart_init_common(const struct dev_defn *defn, void *const uart_mmio_vaddr,
 
     regs->iir_fcr = iir_fcr;
 
+    // Add delay (10us as best guess), as register data might not be set otherwise, leading to a fault in FIFO check
+    ps_udelay(10);
+
     /* Read the status bit to ensure the FIFO was enabled. */
     iir_fcr = regs->iir_fcr;
+
     if (EXTRACT_BITS(iir_fcr,
                      IIR_FIFO_MODE_STATUS_SHIFT,
                      IIR_FIFO_MODE_STATUS_MASK) != 3) {

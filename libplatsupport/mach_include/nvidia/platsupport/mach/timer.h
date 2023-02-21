@@ -33,6 +33,7 @@ typedef enum {
 struct tmr_map {
     uint32_t pvt;    /* present trigger value */
     uint32_t pcr;    /* present count value */
+    uint32_t tmrcssr;
 };
 
 

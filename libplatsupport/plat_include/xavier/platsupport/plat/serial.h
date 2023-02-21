@@ -1,7 +1,6 @@
 /*
- * Copyright 2018, Data61, CSIRO (ABN 41 687 119 230)
- *
- * SPDX-License-Identifier: BSD-2-Clause
+ * Copyright (C) 2022, HENSOLDT Cyber GmbH
+ * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #pragma once
@@ -23,12 +22,7 @@
 #define UARTC_IRQ    (114 + 32)
 #define UARTD_IRQ    (115 + 32)
 
-#if defined(CONFIG_PLAT_PLAT_JETSON_TX2_NX_A206)
-#define PS_SERIAL_DEFAULT   NV_UARTC
-#define DEFAULT_SERIAL_PADDR UARTC_PADDR
-#define DEFAULT_SERIAL_INTERRUPT UARTC_IRQ
-#else
+
 #define PS_SERIAL_DEFAULT   NV_UARTA
 #define DEFAULT_SERIAL_PADDR UARTA_PADDR
 #define DEFAULT_SERIAL_INTERRUPT UARTA_IRQ
-#endif

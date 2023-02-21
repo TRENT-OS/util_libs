@@ -12,11 +12,12 @@
 #include <utils/util.h>
 #include <sys/types.h>
 #include <errno.h>
-/* For clock.h and mux.h */
+/* For clock.h, reset.h and mux.h */
 typedef struct ps_io_ops ps_io_ops_t;
 
 #ifdef CONFIG_ARCH_ARM
 #include <platsupport/clock.h>
+#include <platsupport/reset.h>
 #include <platsupport/mux.h>
 #endif
 #include <platsupport/irq.h>
@@ -494,6 +495,7 @@ struct ps_io_ops {
     ps_io_fdt_t io_fdt;
 #ifdef CONFIG_ARCH_ARM
     clock_sys_t clock_sys;
+    reset_sys_t reset_sys;
     mux_sys_t mux_sys;
 #endif
     ps_interface_registration_ops_t interface_registration_ops;

@@ -184,5 +184,6 @@ enum reset_id {
     RESET_SCE_DBGRESETN,
     RESET_SCE_PRESETDBGN,
     RESET_EQOS,
+    RESET_UARTC,
     NRESETS
 };

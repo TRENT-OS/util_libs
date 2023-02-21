@@ -27,8 +27,14 @@
 #define TMR_SHARED_OFFSET   0x1a0
 
 #define NV_TMR_PATH "/timer@60005000"
+
+#if defined(CONFIG_PLAT_JETSON_NANO_2GB_DEV_KIT)
+#define NV_TMR_ID TMR3
+#define NV_TMR_ID_OFFSET TMR3_OFFSET
+#else
 #define NV_TMR_ID TMR1
 #define NV_TMR_ID_OFFSET TMR1_OFFSET
+#endif
 
 struct tmr_shared_map {
     uint32_t intr_status;

@@ -134,10 +134,18 @@ static int allocate_irq_callback(ps_irq_t irq, unsigned curr_num, size_t num_irq
 {
     assert(token != NULL);
     nv_tmr_t *tmr = token;
+
+#ifdef CONFIG_PLAT_XAVIER
+    /* Skip all interrupts except the second */
+    if (curr_num != 1) {
+        return 0;
+    }
+#else
     /* Skip all interrupts except the first */
     if (curr_num != 0) {
         return 0;
     }
+#endif
 
     tmr->irq_id = ps_irq_register(&tmr->ops.irq_ops, irq, nv_tmr_handle_irq, tmr);
     if (tmr->irq_id < 0) {
@@ -195,6 +203,13 @@ int nv_tmr_init(nv_tmr_t *tmr, ps_io_ops_t ops, char *device_path, ltimer_callba
     tmr->tmr_map->pvt = 0;
     tmr->tmr_map->pcr = BIT(PCR_INTR_CLR_BIT);
 
+#if defined(CONFIG_PLAT_TX2) || defined(CONFIG_PLAT_XAVIER)
+    /* Do not disable TSC, us and OSC counters */
+    tmr->tmr_shared_map->TKECR = 0;
+#endif
+    /* Select timer clock source */
+    tmr->tmr_map->tmrcssr = 0;
+
     /* The following #ifdef is for some platform specific init for tk1, tx1, tx2
      * currently this custom init is only one line each hence using the ifdef.
      * If the platform specific code becomes any larger, then it should be considered
@@ -203,6 +218,9 @@ int nv_tmr_init(nv_tmr_t *tmr, ps_io_ops_t ops, char *device_path, ltimer_callba
 #ifdef CONFIG_PLAT_TX2
     /* Route the interrupt to the correct shared interrupt number. */
     tmr->tmr_shared_map->TKEIE[NV_TMR_ID] = BIT(NV_TMR_ID);
+#elif CONFIG_PLAT_XAVIER
+    /* currently, do nothing, as setting the TKEIE leads to an overwrite of pre-existing settings
+     * in the respective registers and therefore to a freeze */
 #else
     /* Just unconditionally set the divisor as if "clk_m" is always 12MHz,
      * because it actually is always 12MHz on TK1 or TX1.

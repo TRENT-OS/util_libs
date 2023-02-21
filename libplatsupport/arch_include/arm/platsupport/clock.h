@@ -58,6 +58,8 @@ struct clock {
     clk_t *(*init)(clk_t *clk);
     freq_t (*get_freq)(clk_t *);
     freq_t (*set_freq)(clk_t *, freq_t hz);
+    uint32_t (*get_source)(clk_t *);
+    uint32_t (*set_source)(clk_t *, uint32_t source);
     void (*recal)(clk_t *);
 };
 
@@ -139,6 +141,20 @@ static inline int clk_gate_enable(clock_sys_t *clock_sys, enum clock_gate gate,
     assert(clock_sys);
     assert(clock_sys->gate_enable);
     return clock_sys->gate_enable(clock_sys, gate, mode);
+}
+
+static inline uint32_t clk_get_source(clk_t *clk)
+{
+    assert(clk);
+    assert(clk->get_source);
+    return clk->get_source(clk);
+}
+
+static inline uint32_t clk_set_source(clk_t *clk, uint32_t clk_src)
+{
+    assert(clk);
+    assert(clk->set_source);
+    return clk->set_source(clk, clk_src);
 }
 
 /**

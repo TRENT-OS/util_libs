@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <platsupport/io.h>
 #include <platsupport/plat/reset.h>
 
 typedef enum reset_id reset_id_t;
@@ -16,6 +15,8 @@ typedef struct reset_sys {
     int (*reset_deassert)(void *data, reset_id_t id);
     void *data;
 } reset_sys_t;
+
+#include <platsupport/io.h>
 
 int reset_sys_init(ps_io_ops_t *io_ops, void *dependencies, reset_sys_t *reset);
 
