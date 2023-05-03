@@ -10,12 +10,24 @@
 
 /* This information is taken from the device tree. */
 #define UART0_PADDR     0x10000000
+#define UART1_PADDR     0x10002000
+#define UART2_PADDR     0x10003000
+#define UART3_PADDR     0x10004000
 #define UART0_IRQ       10
+#define UART1_IRQ       12
+#define UART2_IRQ       13
+#define UART3_IRQ       14
 
 enum chardev_id {
     UART0,
+    UART1,
+    UART2,
+    UART3,
     /* Aliases */
     PS_SERIAL0 = UART0,
+    PS_SERIAL1 = UART1,
+    PS_SERIAL2 = UART2,
+    PS_SERIAL3 = UART3,
     /* defaults */
     PS_SERIAL_DEFAULT = UART0
 };

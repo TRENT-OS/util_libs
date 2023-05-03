@@ -12,6 +12,9 @@
 #include <utils/util.h>
 
 static const int uart0_irqs[] = {UART0_IRQ, -1};
+static const int uart1_irqs[] = {UART1_IRQ, -1};
+static const int uart2_irqs[] = {UART2_IRQ, -1};
+static const int uart3_irqs[] = {UART3_IRQ, -1};
 
 #define UART_DEFN(devid) {          \
     .id      = UART##devid,         \
@@ -23,6 +26,9 @@ static const int uart0_irqs[] = {UART0_IRQ, -1};
 
 static const struct dev_defn dev_defn[] = {
     UART_DEFN(0),
+    UART_DEFN(1),
+    UART_DEFN(2),
+    UART_DEFN(3),
 };
 
 struct ps_chardevice *ps_cdev_init(enum chardev_id id, const ps_io_ops_t *o, struct ps_chardevice *d)
