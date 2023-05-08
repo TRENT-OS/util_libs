@@ -49,6 +49,7 @@ enum {
 #define TAG_SET_POWER_STATE     0x00028001
 #define TAG_GET_CLOCK_RATE      0x00030002
 #define TAG_GET_MAC_ADDRESS     0x00010003
+#define TAG_SET_GPIO_STATE	    0x00038041
 
 // TODO: Add more property tags if needed
 
@@ -102,6 +103,19 @@ typedef struct {
 }
 PropertyTag_GetMACAddress_Response_t;
 
+typedef struct {
+    MailboxInterface_PropertyTag_t tag;
+    uint32_t gpio_id;
+}
+PropertyTag_SetGPIOState_Request_t;
+
+typedef struct {
+    MailboxInterface_PropertyTag_t tag;
+    uint32_t gpio_id;
+    uint32_t state;
+}
+PropertyTag_SetGPIOState_Response_t;
+
 // TODO: Add more request/reponse tags if needed
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -113,5 +127,7 @@ bool mailbox_set_power_state_on(mailbox_t *mbox, uint32_t device_id);
 int mailbox_get_clock_rate(mailbox_t *mbox, uint32_t clock_id);
 
 bool mailbox_get_mac_address(mailbox_t *mbox, uint8_t buffer[MAC_ADDRESS_SIZE]);
+
+bool mailbox_set_gpio_state(mailbox_t *mbox, uint32_t gpio_id);
 
 // TODO: Add more mailbox functions if needed

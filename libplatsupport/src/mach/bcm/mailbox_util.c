@@ -130,3 +130,28 @@ bool mailbox_get_mac_address(mailbox_t *mbox, uint8_t buffer[MAC_ADDRESS_SIZE])
 
     return true;
 }
+
+
+bool mailbox_set_gpio_state(mailbox_t *mbox, uint32_t gpio_id)
+{
+
+    PropertyTag_SetGPIOState_Request_t TagRequest = {
+        .gpio_id = gpio_id
+    };
+
+    PropertyTag_SetGPIOState_Response_t TagResponse;
+
+    int status = mbox_req_resp(mbox,
+                               TAG_SET_GPIO_STATE,
+                               &TagRequest,
+                               sizeof(TagRequest),
+                               &TagResponse,
+                               sizeof(TagResponse));
+
+    if (MAILBOX_OK != status) {
+        ZF_LOGE("Failed to set gpio state of gpio %d - error code: %d!", gpio_id, status);
+        return false;
+    }
+
+    return true;
+}
