@@ -1297,6 +1297,17 @@ static int imx6_mux_feature_enable(const mux_sys_t *mux, mux_feature_t mux_featu
         m->iomuxc->uart1_uart_rx_data_select_input  = IOMUXC_IS_DAISY(3);
         return 0;
 
+    case MUX_USDHC2_CD_B:
+        ZF_LOGD("Muxing for USDHC2\n");
+        m->iomuxc->sw_pad_ctl_pad_key_col2 = 0x1b0b0;
+        m->iomuxc->sw_mux_ctl_pad_key_col2 = IOMUXC_MUXCTL_MODE(5)
+                                           | IOMUXC_MUXCTL_FORCE_INPUT;
+        // MX6SX_PAD_KEY_COL4__I2C3_SCL     0x4001b8b1
+        // MX6SX_PAD_KEY_COL4__I2C3_SCL     0x00B4 0x03FC 0x07B8 0x2 0x2
+        // MX6SX_PAD_KEY_COL2__GPIO2_IO_12  0x1b0b0
+        // MX6SX_PAD_KEY_COL2__GPIO2_IO_12  0x00AC 0x03F4 0x0000 0x5 0x0
+        return 0;
+
 #elif defined(CONFIG_PLAT_IMX6SX)
 
     case MUX_I2C1:
@@ -1545,8 +1556,20 @@ int imx6sx_mux_init_split(void *iomuxc, void *iomuxc_gpr, mux_sys_t *mux)
 
 int mux_sys_init(ps_io_ops_t *io_ops, UNUSED void *dependencies, mux_sys_t *mux)
 {
+    ZF_LOGD("Called mux_sys_init() in mux.c\n");
+
     MAP_IF_NULL(io_ops, IMX6_IOMUXC, _mux.iomuxc);
+    ZF_LOGD("Called mux_sys_init() in mux.c after mapping\n");
+    ZF_LOGD("_mux.iomuxc: %lu\n", _mux.iomuxc);
+
 #ifdef CONFIG_PLAT_IMX6SX
+    ZF_LOGD("_mux.iomuxc->sw_mux_ctl_pad_enet1_mdc: %lu\n", _mux.iomuxc->sw_pad_ctl_pad_enet1_mdc);
+    ZF_LOGD("_mux.iomuxc->sw_mux_ctl_pad_enet1_mdio: %lu\n", _mux.iomuxc->sw_pad_ctl_pad_enet1_mdio);
+#endif
+
+    ZF_LOGD("_mux.iomuxc->sw_pad_ctl_pad_sd2_data0: %lu\n", _mux.iomuxc->sw_pad_ctl_pad_sd2_data0);
+#ifdef CONFIG_PLAT_IMX6SX
+    ZF_LOGD("Called mux_sys_init() in mux.c - Mapping also IOMUXC_GPR\n");
     MAP_IF_NULL(io_ops, IMX6_IOMUXC_GPR, _mux.iomuxc_gpr);
 #endif
     return imx6_mux_init_common(mux);

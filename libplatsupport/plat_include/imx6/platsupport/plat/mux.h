@@ -19,6 +19,7 @@ enum mux_feature {
 #error "unknown i.MX6 SOC"
 #endif
     MUX_UART1,
+    MUX_USDHC2_CD_B,
     NMUX_FEATURES
 };
 
