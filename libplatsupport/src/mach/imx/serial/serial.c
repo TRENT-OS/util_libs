@@ -114,8 +114,9 @@ int uart_putchar(
 {
     imx_uart_regs_t *regs = imx_uart_get_priv(d);
 
-    if (internal_is_tx_fifo_busy(regs)) {
-        return -1;
+
+    while (internal_is_tx_fifo_busy(regs)) {
+            /* busy loop */
     }
 
     if (c == '\n' && (d->flags & SERIAL_AUTO_CR)) {
